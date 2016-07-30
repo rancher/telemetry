@@ -1,0 +1,8 @@
+/.dapper
+/bin
+*.swp
+/.trash-cache
+/build
+/dist
+/telemetry
+/.telemetry_id

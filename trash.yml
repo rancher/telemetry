@@ -1,0 +1,12 @@
+import:
+- package: github.com/Sirupsen/logrus
+  version: 07d998d174c4e2dc90e2f1989a20724220bca1ff
+
+- package: github.com/gorilla/context
+  version: 215affda49addc4c8ef7e2534915df2c8c35c6cd
+
+- package: github.com/gorilla/mux
+  version: 104068abd5cf50032c57aecbf2b8ce5b0a08a2cb
+
+- package: github.com/satori/go.uuid
+  version: 0aa62d5ddceb50dbcb909d790b5345affd3669b6
