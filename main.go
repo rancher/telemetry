@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -12,62 +11,127 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
+	"github.com/satori/go.uuid"
+	"github.com/urfave/cli"
 
-	"github.com/vincent99/telemetry/collector"
+	rancher "github.com/rancher/go-rancher/client"
+	collector "github.com/vincent99/telemetry/collector"
+	record "github.com/vincent99/telemetry/record"
 )
 
-var (
-	showVersion = flag.Bool("version", false, "Show version")
-	debug       = flag.Bool("debug", false, "Debug")
-	listen      = flag.String("listen", "127.0.0.1:8114", "Address to listen to (TCP)")
-	logFile     = flag.String("log", "", "Log file")
-	pidFile     = flag.String("pid-file", "", "PID to write to")
+const UID_FILE = ".telemetry_id"
 
+var (
 	router = mux.NewRouter()
 
 	VERSION string
 	ticker  = time.NewTicker(1 * time.Minute)
+
+	url       string
+	accessKey string
+	secretKey string
 )
 
 func main() {
-	parseFlags()
+	app := cli.NewApp()
+	app.Name = "telemetry"
+	app.Usage = "Rancher telemetry daemon"
+	app.Version = VERSION
+	app.Action = run
+	app.Flags = []cli.Flag{
+		cli.BoolFlag{
+			Name:   "debug",
+			Usage:  "debug logging",
+			EnvVar: "TELEMETRY_DEBUG",
+		},
 
-	if *showVersion {
-		fmt.Printf("%s\n", VERSION)
-		os.Exit(0)
+		cli.StringFlag{
+			Name:   "listen, l",
+			Usage:  "address/port to listen on",
+			Value:  "0.0.0.0:8114",
+			EnvVar: "TELEMETRY_LISTEN",
+		},
+
+		cli.StringFlag{
+			Name:   "log",
+			Usage:  "path to log to",
+			Value:  "",
+			EnvVar: "TELEMETRY_LOG",
+		},
+
+		cli.StringFlag{
+			Name:   "pid-file",
+			Usage:  "path to write PID to",
+			Value:  "",
+			EnvVar: "TELEMETRY_PID_FILE",
+		},
+
+		cli.StringFlag{
+			Name:        "url",
+			Usage:       "url to reach cattle",
+			Value:       "",
+			EnvVar:      "CATTLE_URL",
+			Destination: &url,
+		},
+
+		cli.StringFlag{
+			Name:        "access-key",
+			Usage:       "access key for api",
+			Value:       "",
+			EnvVar:      "CATTLE_ACCESS_KEY",
+			Destination: &accessKey,
+		},
+
+		cli.StringFlag{
+			Name:        "secret-key",
+			Usage:       "secret key for api",
+			Value:       "",
+			EnvVar:      "CATTLE_SECRET_KEY",
+			Destination: &secretKey,
+		},
 	}
 
-	log.Infof("Starting telemetry %s", VERSION)
-
-	router.HandleFunc("/favicon.ico", http.NotFound)
-	router.HandleFunc("/", show).Methods("GET")
-	router.HandleFunc("/", reload).Methods("POST")
-
-	log.Info("Listening on ", *listen)
-	log.Fatal(http.ListenAndServe(*listen, router))
+	app.Run(os.Args)
 }
 
-func parseFlags() {
-	flag.Parse()
+func run(c *cli.Context) error {
+	log.Infof("Telemetry %s", VERSION)
 
-	if *debug {
+	if c.Bool("debug") {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	if *logFile != "" {
-		if output, err := os.OpenFile(*logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666); err != nil {
-			log.Fatalf("Failed to log to file %s: %v", *logFile, err)
+	logFile := c.String("log")
+	if logFile != "" {
+		if output, err := os.OpenFile(logFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666); err != nil {
+			str := fmt.Sprintf("Failed to log to file %s: %v", logFile, err)
+			return cli.NewExitError(str, 1)
 		} else {
 			log.SetOutput(output)
 		}
 	}
 
-	if *pidFile != "" {
-		log.Infof("Writing pid %d to %s", os.Getpid(), *pidFile)
-		if err := ioutil.WriteFile(*pidFile, []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
-			log.Fatalf("Failed to write pid file %s: %v", *pidFile, err)
+	pidFile := c.String("pid-file")
+	if pidFile != "" {
+		log.Infof("Writing pid %d to %s", os.Getpid(), pidFile)
+		if err := ioutil.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
+			str := fmt.Sprintf("Failed to write pid file %s: %v", pidFile, err)
+			return cli.NewExitError(str, 1)
 		}
 	}
+
+	if url == "" || accessKey == "" || secretKey == "" {
+		return cli.NewExitError("URL, Access Key, and Secret Key are required", 1)
+	}
+
+	router.HandleFunc("/favicon.ico", http.NotFound)
+	router.HandleFunc("/", show).Methods("GET")
+	router.HandleFunc("/", reload).Methods("POST")
+
+	listen := c.String("listen")
+	log.Info("Listening on ", listen)
+	log.Fatal(http.ListenAndServe(listen, router))
+	return nil
 }
 
 func respondError(w http.ResponseWriter, req *http.Request, msg string, statusCode int) {
@@ -105,12 +169,41 @@ func show(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func collect() (*Record, error) {
-	r := &Record{
-		Version:      1,
-		Installation: collector.GetInstallation(),
-		Os:           collector.GetOs(),
+func collect() (record.Record, error) {
+	client, err := rancher.NewRancherClient(&rancher.ClientOpts{
+		Url:       url,
+		AccessKey: accessKey,
+		SecretKey: secretKey,
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
+	r := record.Record{}
+	r["v"] = 1                                    // Record version
+	r["uid"] = getUid()                           // Installation UID
+	r["ts"] = time.Now().UTC().Round(time.Second) // Local time
+
+	opt := collector.CollectorOpts{
+		Client: client,
+	}
+
+	collector.Run(&r, &opt)
+
 	return r, nil
+}
+
+func getUid() string {
+	var id string
+
+	data, err := ioutil.ReadFile(UID_FILE)
+	if err == nil {
+		id = string(data)
+	} else {
+		id = uuid.NewV4().String()
+		ioutil.WriteFile(UID_FILE, []byte(id), 0644)
+	}
+
+	return id
 }
