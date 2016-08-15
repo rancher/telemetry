@@ -2,13 +2,17 @@ package collector
 
 import (
 	log "github.com/Sirupsen/logrus"
+	"github.com/satori/go.uuid"
 	"regexp"
 )
 
+const UID_SETTING = "telemetry.uid"
+
 type Installation struct {
-	Image      string `json:"image"`
-	Version    string `json:"version"`
-	AuthConfig string `json:"auth"`
+	Uid        string     `json:"uid"`
+	Image      string     `json:"image"`
+	Version    string     `json:"version"`
+	AuthConfig LabelCount `json:"auth"`
 }
 
 func (i Installation) RecordKey() string {
@@ -18,46 +22,58 @@ func (i Installation) RecordKey() string {
 func (i Installation) Collect(c *CollectorOpts) interface{} {
 	log.Debug("Collecting Installation")
 
+	i.Uid = i.GetUid(c)
+	i.Image = "unknown"
+	i.Version = "unknown"
+	i.AuthConfig = make(LabelCount)
+
 	if image, ok := GetSetting(c.Client, "rancher.server.image"); ok {
 		log.Debugf("  Image: %s", image)
-		i.Image = image
+		if image != "" {
+			i.Image = image
+		}
 	}
 
 	if version, ok := GetSetting(c.Client, "rancher.server.version"); ok {
 		log.Debugf("  Version: %s", version)
-		i.Version = version
-	}
-
-	// @TODO replace with unified authConfig
-	if enabled, ok := GetSetting(c.Client, "api.security.enabled"); ok {
-		if provider, ok := GetSetting(c.Client, "api.auth.provider.configured"); ok {
-			if enabled == "true" {
-				i.AuthConfig = regexp.MustCompile("(?i)^(.*?)config$").ReplaceAllString(provider, "$1")
-			} else {
-				i.AuthConfig = "none"
-			}
+		if version != "" {
+			i.Version = version
 		}
 	}
 
+	// @TODO replace with unified authConfig
+	authConfig := "none"
+	if enabled, ok := GetSetting(c.Client, "api.security.enabled"); ok {
+		if provider, ok := GetSetting(c.Client, "api.auth.provider.configured"); ok {
+			if enabled == "true" {
+				authConfig = regexp.MustCompile("(?i)^(.*?)config$").ReplaceAllString(provider, "$1")
+			}
+		}
+	}
+	i.AuthConfig.Increment(authConfig)
+
+	log.Debug("Returning %s", i)
 	return i
 }
 
-/*
-func settingsAsMap(client *rancher.RancherClient) (map[string]string, error) {
-	list, err := c.Client.Setting.List(&rancher.ListOpts{})
-
-	if err != nil {
-		return nil, err
+func (i Installation) GetUid(c *CollectorOpts) string {
+	uid, ok := GetSetting(c.Client, UID_SETTING)
+	if ok && uid != "" {
+		log.Debugf("  Using Existing Uid: %s", uid)
+		return uid
 	}
 
-	out := make(map[string]string)
-	for _, s := range list {
-		out[s.Name] = s.Value
-	}
+	uid = uuid.NewV4().String()
+	err := SetSetting(c.Client, UID_SETTING, uid)
 
-	return out
+	if err == nil {
+		log.Debugf("  Generated Uid: %s", uid)
+		return uid
+	} else {
+		log.Debugf("  Error Generating Uid: %s", err)
+		return ""
+	}
 }
-*/
 
 func init() {
 	Register(Installation{})

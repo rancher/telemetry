@@ -6,8 +6,8 @@ import (
 )
 
 type Environment struct {
-	Total         int            `json:"total"`
-	Orchestration map[string]int `json:"orch"`
+	Total         int        `json:"total"`
+	Orchestration LabelCount `json:"orch"`
 }
 
 func (s Environment) RecordKey() string {
@@ -31,25 +31,25 @@ func (out Environment) Collect(c *CollectorOpts) interface{} {
 	total := len(list.Data)
 	log.Debugf("  Found %d Environments", total)
 
-	out.Orchestration = make(map[string]int)
+	out.Orchestration = make(LabelCount)
 	out.Total = total
 
 	for _, env := range list.Data {
 		// Enviornments can technically have more than one of these set...
 		found := false
 		if env.Kubernetes {
-			IncrementMap(&out.Orchestration, "kubernetes")
+			out.Orchestration.Increment("kubernetes")
 			found = true
 		} else if env.Swarm {
-			IncrementMap(&out.Orchestration, "swarm")
+			out.Orchestration.Increment("swarm")
 			found = true
 		} else if env.Mesos {
-			IncrementMap(&out.Orchestration, "mesos")
+			out.Orchestration.Increment("mesos")
 			found = true
 		}
 
 		if !found {
-			IncrementMap(&out.Orchestration, "cattle")
+			out.Orchestration.Increment("cattle")
 		}
 	}
 

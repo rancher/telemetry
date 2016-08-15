@@ -26,13 +26,13 @@ type MemoryInfo struct {
 }
 
 type Host struct {
-	Count  int            `json:"count"`
-	Cpu    CpuInfo        `json:"cpu"`
-	Mem    MemoryInfo     `json:"mem"`
-	Kernel map[string]int `json:"kernel"`
-	Os     map[string]int `json:"os"`
-	Docker map[string]int `json:"docker"`
-	Driver map[string]int `json:"driver"`
+	Count  int        `json:"count"`
+	Cpu    CpuInfo    `json:"cpu"`
+	Mem    MemoryInfo `json:"mem"`
+	Kernel LabelCount `json:"kernel"`
+	Os     LabelCount `json:"os"`
+	Docker LabelCount `json:"docker"`
+	Driver LabelCount `json:"driver"`
 }
 
 func (h Host) RecordKey() string {
@@ -54,10 +54,10 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 	var cpuUtils []float64
 	var memUtils []float64
 
-	h.Kernel = make(map[string]int)
-	h.Os = make(map[string]int)
-	h.Docker = make(map[string]int)
-	h.Driver = make(map[string]int)
+	h.Kernel = make(LabelCount)
+	h.Os = make(LabelCount)
+	h.Docker = make(LabelCount)
+	h.Driver = make(LabelCount)
 
 	// Hosts
 	for _, host := range hostList.Data {
@@ -107,12 +107,12 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 
 		// OS
 		osInfo := info["osInfo"].(map[string]interface{})
-		IncrementMap(&h.Kernel, osInfo["kernelVersion"].(string))
-		IncrementMap(&h.Os, osInfo["operatingSystem"].(string))
+		h.Kernel.Increment(osInfo["kernelVersion"].(string))
+		h.Os.Increment(osInfo["operatingSystem"].(string))
 
 		docker := osInfo["dockerVersion"].(string)
 		docker = regexp.MustCompile("(?i)^docker version (.*)").ReplaceAllString(docker, "v$1")
-		IncrementMap(&h.Docker, docker)
+		h.Docker.Increment(docker)
 	}
 
 	h.Cpu.UtilAvg = Clamp(0, Round(Average(cpuUtils)), 100)
@@ -129,7 +129,7 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 
 	log.Debugf("  Found %d Machines", len(machineList.Data))
 	for _, machine := range machineList.Data {
-		IncrementMap(&h.Driver, machine.Driver)
+		h.Driver.Increment(machine.Driver)
 	}
 	h.Driver["custom"] = Max(0, h.Count-len(machineList.Data))
 

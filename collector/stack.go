@@ -31,7 +31,7 @@ func (out Stack) Collect(c *CollectorOpts) interface{} {
 	total := len(list.Data)
 	log.Debugf("  Found %d Stacks", total)
 
-	byEnvironment := make(map[string]int)
+	byEnvironment := make(LabelCount)
 
 	out.Total = total
 
@@ -44,7 +44,7 @@ func (out Stack) Collect(c *CollectorOpts) interface{} {
 			out.FromCatalog++
 		}
 
-		IncrementMap(&byEnvironment, stack.AccountId)
+		byEnvironment.Increment(stack.AccountId)
 	}
 
 	var flat []float64

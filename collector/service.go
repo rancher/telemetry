@@ -5,12 +5,12 @@ import (
 )
 
 type Service struct {
-	Active      int            `json:"active"`
-	Total       int            `json:"total"`
-	Kind        map[string]int `json:"kind"`
-	PerStackMin int            `json:"per_stack_min"`
-	PerStackAvg int            `json:"per_stack_avg"`
-	PerStackMax int            `json:"per_stack_max"`
+	Active      int        `json:"active"`
+	Total       int        `json:"total"`
+	Kind        LabelCount `json:"kind"`
+	PerStackMin int        `json:"per_stack_min"`
+	PerStackAvg int        `json:"per_stack_avg"`
+	PerStackMax int        `json:"per_stack_max"`
 }
 
 func (s Service) RecordKey() string {
@@ -29,10 +29,10 @@ func (out Service) Collect(c *CollectorOpts) interface{} {
 
 	log.Debugf("  Found %d Services", len(list.Data))
 
-	byStack := make(map[string]int)
+	byStack := make(LabelCount)
 	total := len(list.Data)
 
-	out.Kind = make(map[string]int)
+	out.Kind = make(LabelCount)
 	out.Total = total
 
 	for _, service := range list.Data {
@@ -40,8 +40,8 @@ func (out Service) Collect(c *CollectorOpts) interface{} {
 			out.Active++
 		}
 
-		IncrementMap(&byStack, service.EnvironmentId)
-		IncrementMap(&out.Kind, service.Type)
+		byStack.Increment(service.EnvironmentId)
+		out.Kind.Increment(service.Type)
 	}
 
 	var flat []float64

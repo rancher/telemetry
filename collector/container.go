@@ -28,7 +28,7 @@ func (out Container) Collect(c *CollectorOpts) interface{} {
 
 	log.Debugf("  Found %d Containers", len(list.Data))
 
-	byHost := make(map[string]int)
+	byHost := make(LabelCount)
 
 	total := len(list.Data)
 	out.Total = total
@@ -37,7 +37,7 @@ func (out Container) Collect(c *CollectorOpts) interface{} {
 		if container.State == "running" {
 			out.Running++
 		}
-		IncrementMap(&byHost, container.HostId)
+		byHost.Increment(container.HostId)
 	}
 
 	var flat []float64

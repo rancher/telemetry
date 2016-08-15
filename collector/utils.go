@@ -49,19 +49,6 @@ func Clamp(min, x, max int) int {
 	return Max(min, Min(x, max))
 }
 
-func IncrementMap(m *map[string]int, k string) {
-	if len(k) == 0 {
-		k = "(unknown)"
-	}
-
-	cur, ok := (*m)[k]
-	if ok {
-		(*m)[k] = cur + 1
-	} else {
-		(*m)[k] = 1
-	}
-}
-
 func NonRemoved() rancher.ListOpts {
 	filters := make(map[string]interface{})
 	filters["state_ne"] = "removed"
@@ -76,9 +63,54 @@ func NonRemoved() rancher.ListOpts {
 func GetSetting(client *rancher.RancherClient, key string) (string, bool) {
 	setting, err := client.Setting.ById(key)
 	if err != nil {
-		log.Errorf("Failed to get Setting key=%s, err=%s", key, err)
+		log.Errorf("GetSetting(%s): Error: %s", key, err)
 		return "", false
 	}
 
+	if setting.Value == "" {
+		log.Debugf("GetSetting(%s): Not Set", key)
+	} else {
+		log.Debugf("GetSetting(%s) = %s", key, setting.Value)
+	}
 	return setting.Value, true
+}
+
+func SetSetting(client *rancher.RancherClient, key string, value string) error {
+	setting, err := client.Setting.ById(key)
+	if err == nil {
+		_, err = client.Setting.Update(setting, map[string]interface{}{"value": value})
+		if err == nil {
+			log.Debugf("UpdateSetting(%s,%s)", key, value)
+		} else {
+			log.Debugf("UpdateSetting(%s,%s): Error: %s", key, value, err)
+		}
+		return err
+	}
+
+	setting, err = client.Setting.Create(&rancher.Setting{
+		Name:  key,
+		Value: value,
+	})
+
+	if err == nil {
+		log.Debugf("CreateSetting(%s,%s)", key, value)
+	} else {
+		log.Debugf("CreateSetting(%s,%s): Error: %s", key, value, err)
+	}
+	return err
+}
+
+type LabelCount map[string]int
+
+func (m *LabelCount) Increment(k string) {
+	if len(k) == 0 {
+		k = "(unknown)"
+	}
+
+	cur, ok := (*m)[k]
+	if ok {
+		(*m)[k] = cur + 1
+	} else {
+		(*m)[k] = 1
+	}
 }
