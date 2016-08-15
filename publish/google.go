@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"reflect"
 	"strconv"
 
 	collector "github.com/vincent99/telemetry/collector"
@@ -17,108 +16,121 @@ const GA_URL = "https://www.google-analytics.com/collect"
 
 type Google struct {
 	tid              string
-	uid              string
 	telemetryVersion string
-	rancherImage     string
-	rancherVersion   string
 }
 
-func (g *Google) Configure(version string, c *cli.Context) {
-	g.tid = c.String("ga-tid")
-	if version == "" {
-		g.telemetryVersion = "dev"
-	} else {
-		g.telemetryVersion = version
+type GoogleOpts struct {
+	tid              string
+	telemetryVersion string
+
+	rancherImage   string
+	rancherVersion string
+	uid            string
+	clientIp       string
+}
+
+func NewGoogle(c *cli.Context) *Google {
+	out := &Google{
+		telemetryVersion: c.App.Version,
+		tid:              c.String("ga-tid"),
 	}
 
+	if out.tid == "" {
+		log.Warn("ga-tid option is required to publish to Google Analytics")
+	}
+
+	return out
+}
+
+func (g *Google) Report(r record.Record, clientIp string) error {
 	if g.tid == "" {
-		log.Error("ga-tid option is required to publish to Google Analytics")
+		return nil
 	}
-}
 
-func (g *Google) Report(r record.Record) {
 	log.Debugf("Publishing to Google Analytics")
+
+	opts := &GoogleOpts{
+		tid:              g.tid,
+		telemetryVersion: g.telemetryVersion,
+		clientIp:         clientIp,
+	}
 
 	// Ugly, but effective enough
 	switch install := r["install"].(type) {
-	case collector.Installation:
-		g.uid = install.Uid
-		g.rancherImage = install.Image
-		g.rancherVersion = install.Version
+	case map[string]interface{}:
+		opts.uid = install["uid"].(string)
+		opts.rancherImage = install["image"].(string)
+		opts.rancherVersion = install["version"].(string)
 	}
 
 	for category, entry := range r {
-		val := reflect.ValueOf(entry)
-		if val.Kind() == reflect.Struct || val.Kind() == reflect.Map {
-			g.flatten(category, "", val)
+		g.flatten(opts, category, "", "", entry)
+	}
+
+	return nil
+}
+
+func (g *Google) flatten(opts *GoogleOpts, category string, event string, label string, vv interface{}) {
+	//log.Debugf("Flattening %s/%s/%s = %s", category, event, label, vv)
+
+	switch v := vv.(type) {
+
+	case float64:
+		g.sendEvent(opts, category, event, label, int64(collector.Round(v)))
+
+	case int64:
+		g.sendEvent(opts, category, event, label, v)
+
+	case string:
+		// Ignore
+
+	case map[string]interface{}:
+		for key, val := range v {
+			if event == "" {
+				g.flatten(opts, category, key, "", val)
+			} else if label == "" {
+				g.flatten(opts, category, event, key, val)
+			} else {
+				log.Errorf("Map too many levels deep for GA: %s/%s/%s -> ", category, event, label, key)
+			}
 		}
+
+	default:
+		log.Warnf("Unknown flatten field input: %s/%s/%s: %s", category, event, label, v)
 	}
 }
 
-func (g *Google) flatten(category string, event string, v reflect.Value) {
-	t := v.Type()
-
-	for i := 0; i < v.NumField(); i++ {
-		f := v.Field(i)
-		name := t.Field(i).Name
-
-		switch f.Kind() {
-		case reflect.Int:
-			if event == "" {
-				g.sendEvent(category, name, "", f.Int())
-			} else {
-				g.sendEvent(category, event, name, f.Int())
-			}
-
-		case reflect.Struct:
-			if event == "" {
-				g.flatten(category, name, f)
-			} else {
-				log.Errorf("Struct too many levels deep for GA: %s/%s/%s", category, event, name)
-			}
-
-		case reflect.Map:
-			if event == "" {
-				iface := f.Interface()
-				switch m := iface.(type) {
-				case collector.LabelCount:
-					for label, val := range m {
-						g.sendEvent(category, name, label, int64(val))
-					}
-				default:
-					log.Errorf("Unknown map type: %s\n", m)
-				}
-			} else {
-				log.Errorf("Map too many levels deep for GA: %s/%s/%s", category, event, name)
-			}
-
-		case reflect.String:
-			// Ignore
-
-		default:
-			log.Warnf("Unknown flatten field input: %s=%s", name, f)
-		}
+func (g *Google) sendEvent(opts *GoogleOpts, category, action, label string, value int64) error {
+	// Action is required, so ignore top-level keys like r=1
+	if action == "" {
+		return nil
 	}
-}
 
-func (g *Google) sendEvent(category, action, label string, value int64) error {
 	qp := url.Values{}
-	qp.Add("v", "1")                   // Protocol version
-	qp.Add("tid", g.tid)               // Tracking Account ID
-	qp.Add("t", "event")               // Hit type
-	qp.Add("aip", "1")                 // Anonymize source IP addresses
-	qp.Add("an", g.rancherImage)       // App ID (Docker image)
-	qp.Add("av", g.rancherVersion)     // App Version (Image tag)
-	qp.Add("aiid", g.telemetryVersion) // App ID (Docker image)
-	qp.Add("cid", g.uid)               // Installation UID
-	qp.Add("ec", category)             // Category
-	qp.Add("ea", action)               // Action
-	if label != "" {
-		qp.Add("el", label) // Label
-	}
+	qp.Add("v", "1")                       // Protocol version
+	qp.Add("tid", g.tid)                   // Tracking Account ID
+	qp.Add("t", "event")                   // Hit type
+	qp.Add("aip", "1")                     // Anonymize source IP addresses
+	qp.Add("an", opts.rancherImage)        // App ID (Docker image)
+	qp.Add("av", opts.rancherVersion)      // App Version (Image tag)
+	qp.Add("aiid", opts.telemetryVersion)  // App ID (Docker image)
+	qp.Add("cid", opts.uid)                // Installation UID
+	qp.Add("ec", category)                 // Category
+	qp.Add("ea", action)                   // Action
 	qp.Add("ev", strconv.Itoa(int(value))) // Value
 
+	// Client IP
+	if opt.clientIp != "::1" && opts.clientIp != "127.0.0.1" {
+		qp.Add("uip", opts.clientIp)
+	}
+
+	// Label
+	if label != "" {
+		qp.Add("el", label)
+	}
+
 	log.Debugf("Sending: %s", qp.Encode())
+
 	res, err := http.PostForm(GA_URL, qp)
 	if err != nil {
 		log.Errorf("Error sending event: %s", err)

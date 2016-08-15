@@ -52,7 +52,6 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 	}
 	i.AuthConfig.Increment(authConfig)
 
-	log.Debug("Returning %s", i)
 	return i
 }
 
