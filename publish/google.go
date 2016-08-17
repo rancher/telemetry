@@ -8,8 +8,8 @@ import (
 	"net/url"
 	"strconv"
 
-	collector "github.com/vincent99/telemetry/collector"
-	record "github.com/vincent99/telemetry/record"
+	collector "github.com/rancher/telemetry/collector"
+	record "github.com/rancher/telemetry/record"
 )
 
 const GA_URL = "https://www.google-analytics.com/collect"
@@ -35,8 +35,8 @@ func NewGoogle(c *cli.Context) *Google {
 		tid:              c.String("ga-tid"),
 	}
 
-	if out.tid == "" {
-		log.Warn("ga-tid option is required to publish to Google Analytics")
+	if out.tid != "" {
+		log.Info("Google Analytics enabled")
 	}
 
 	return out
@@ -91,7 +91,7 @@ func (g *Google) flatten(opts *GoogleOpts, category string, event string, label 
 			} else if label == "" {
 				g.flatten(opts, category, event, key, val)
 			} else {
-				log.Errorf("Map too many levels deep for GA: %s/%s/%s -> ", category, event, label, key)
+				log.Errorf("Map too many levels deep for GA: %s/%s/%s -> %s", category, event, label, key)
 			}
 		}
 
@@ -120,7 +120,7 @@ func (g *Google) sendEvent(opts *GoogleOpts, category, action, label string, val
 	qp.Add("ev", strconv.Itoa(int(value))) // Value
 
 	// Client IP
-	if opt.clientIp != "::1" && opts.clientIp != "127.0.0.1" {
+	if opts.clientIp != "::1" && opts.clientIp != "127.0.0.1" {
 		qp.Add("uip", opts.clientIp)
 	}
 

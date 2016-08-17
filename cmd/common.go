@@ -27,3 +27,9 @@ func respondSuccess(w http.ResponseWriter, req *http.Request, val interface{}) {
 		respondError(w, req, "Error serializing to JSON: "+err.Error(), http.StatusInternalServerError)
 	}
 }
+
+type Collection struct {
+	Type         string      `json:"type"`
+	ResourceType string      `json:"resourceType"`
+	Data         interface{} `json:"data"`
+}

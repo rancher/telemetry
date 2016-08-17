@@ -10,7 +10,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	record "github.com/vincent99/telemetry/record"
+	record "github.com/rancher/telemetry/record"
 )
 
 type ToUrl struct {

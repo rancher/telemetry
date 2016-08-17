@@ -9,7 +9,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	cmd "github.com/vincent99/telemetry/cmd"
+	cmd "github.com/rancher/telemetry/cmd"
 )
 
 var (
@@ -21,7 +21,13 @@ func main() {
 	app.Name = "telemetry"
 	app.Author = "Rancher Labs, Inc."
 	app.Usage = "Rancher telemetry"
-	app.Version = "v0.0.1" //VERSION
+
+	if VERSION == "" {
+		app.Version = "git"
+	} else {
+		app.Version = VERSION
+	}
+
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:   "debug",

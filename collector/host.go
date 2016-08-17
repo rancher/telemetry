@@ -17,22 +17,23 @@ type CpuInfo struct {
 }
 
 type MemoryInfo struct {
-	MbMin   int `json:"min_mb"`
-	MbMax   int `json:"max_mb"`
-	MbTotal int `json:"total_mb"`
+	MinMb   int `json:"mb_min"`
+	MaxMb   int `json:"mb_max"`
+	TotalMb int `json:"mb_total"`
 	UtilMin int `json:"util_min"`
 	UtilAvg int `json:"util_avg"`
 	UtilMax int `json:"util_max"`
 }
 
 type Host struct {
-	Count  int        `json:"count"`
-	Cpu    CpuInfo    `json:"cpu"`
-	Mem    MemoryInfo `json:"mem"`
-	Kernel LabelCount `json:"kernel"`
-	Os     LabelCount `json:"os"`
-	Docker LabelCount `json:"docker"`
-	Driver LabelCount `json:"driver"`
+	Count      int        `json:"count"`
+	Cpu        CpuInfo    `json:"cpu"`
+	Mem        MemoryInfo `json:"mem"`
+	Kernel     LabelCount `json:"kernel"`
+	Os         LabelCount `json:"os"`
+	DockerFull LabelCount `json:"docker_full"`
+	Docker     LabelCount `json:"docker"`
+	Driver     LabelCount `json:"driver"`
 }
 
 func (h Host) RecordKey() string {
@@ -57,6 +58,7 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 	h.Kernel = make(LabelCount)
 	h.Os = make(LabelCount)
 	h.Docker = make(LabelCount)
+	h.DockerFull = make(LabelCount)
 	h.Driver = make(LabelCount)
 
 	// Hosts
@@ -97,9 +99,9 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 		utilFloat = 100 * float64(used) / float64(total)
 		util = Round(utilFloat)
 
-		h.Mem.MbMin = MinButNotZero(h.Mem.MbMin, total)
-		h.Mem.MbMax = Max(h.Mem.MbMax, total)
-		h.Mem.MbTotal += total
+		h.Mem.MinMb = MinButNotZero(h.Mem.MinMb, total)
+		h.Mem.MaxMb = Max(h.Mem.MaxMb, total)
+		h.Mem.TotalMb += total
 		h.Mem.UtilMin = MinButNotZero(h.Mem.UtilMin, util)
 		h.Mem.UtilMax = Max(h.Mem.UtilMax, util)
 		memUtils = append(memUtils, utilFloat)
@@ -110,8 +112,10 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 		h.Kernel.Increment(osInfo["kernelVersion"].(string))
 		h.Os.Increment(osInfo["operatingSystem"].(string))
 
-		docker := osInfo["dockerVersion"].(string)
-		docker = regexp.MustCompile("(?i)^docker version (.*)").ReplaceAllString(docker, "v$1")
+		dockerFull := osInfo["dockerVersion"].(string)
+		docker := regexp.MustCompile("(?i)^docker version (.*)").ReplaceAllString(dockerFull, "v$1")
+		docker = regexp.MustCompile("(?i)^(.*), build [0-9a-f]+$").ReplaceAllString(docker, "$1")
+		h.DockerFull.Increment(dockerFull)
 		h.Docker.Increment(docker)
 	}
 

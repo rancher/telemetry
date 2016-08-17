@@ -22,7 +22,9 @@ func (i Installation) RecordKey() string {
 func (i Installation) Collect(c *CollectorOpts) interface{} {
 	log.Debug("Collecting Installation")
 
-	i.Uid = i.GetUid(c)
+	uid, _ := i.GetUid(c)
+
+	i.Uid = uid
 	i.Image = "unknown"
 	i.Version = "unknown"
 	i.AuthConfig = make(LabelCount)
@@ -55,11 +57,11 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 	return i
 }
 
-func (i Installation) GetUid(c *CollectorOpts) string {
+func (i Installation) GetUid(c *CollectorOpts) (string, bool) {
 	uid, ok := GetSetting(c.Client, UID_SETTING)
 	if ok && uid != "" {
 		log.Debugf("  Using Existing Uid: %s", uid)
-		return uid
+		return uid, false
 	}
 
 	uid = uuid.NewV4().String()
@@ -67,10 +69,10 @@ func (i Installation) GetUid(c *CollectorOpts) string {
 
 	if err == nil {
 		log.Debugf("  Generated Uid: %s", uid)
-		return uid
+		return uid, true
 	} else {
 		log.Debugf("  Error Generating Uid: %s", err)
-		return ""
+		return "", false
 	}
 }
 

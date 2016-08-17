@@ -2,7 +2,7 @@ package collector
 
 import (
 	rancher "github.com/rancher/go-rancher/client"
-	"github.com/vincent99/telemetry/record"
+	"github.com/rancher/telemetry/record"
 )
 
 type CollectorOpts struct {

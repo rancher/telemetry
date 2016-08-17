@@ -1,7 +1,11 @@
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"strconv"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -9,9 +13,9 @@ import (
 	"github.com/urfave/cli"
 
 	rancher "github.com/rancher/go-rancher/client"
-	collector "github.com/vincent99/telemetry/collector"
-	publish "github.com/vincent99/telemetry/publish"
-	record "github.com/vincent99/telemetry/record"
+	collector "github.com/rancher/telemetry/collector"
+	publish "github.com/rancher/telemetry/publish"
+	record "github.com/rancher/telemetry/record"
 )
 
 var (
@@ -23,6 +27,7 @@ var (
 )
 
 const RECORD_VERSION = 1
+const EXISTING_FILE = ".existing"
 
 func ClientCommand() cli.Command {
 	return cli.Command{
@@ -69,14 +74,14 @@ func ClientCommand() cli.Command {
 			cli.StringFlag{
 				Name:   "interval",
 				Usage:  "reporting interval",
-				Value:  "1h",
+				Value:  "6h",
 				EnvVar: "TELEMETRY_INTERVAL",
 			},
 
 			cli.StringFlag{
 				Name:   "to-url",
 				Usage:  "url to send stats to",
-				Value:  "https://telemetry.rancher.com/publish",
+				Value:  "https://telemetry.rancher.io/publish",
 				EnvVar: "TELEMETRY_TO_URL",
 			},
 		},
@@ -84,6 +89,10 @@ func ClientCommand() cli.Command {
 }
 
 func clientRun(c *cli.Context) error {
+	if c.Bool("once") {
+		return clientShowOnce()
+	}
+
 	log.Infof("Telemetry Client %s", c.App.Version)
 
 	if url == "" || accessKey == "" || secretKey == "" {
@@ -123,10 +132,32 @@ func clientRun(c *cli.Context) error {
 		}
 	}
 
+	// Report immediately on only the first run
+	if !isExisting() {
+		go report()
+	}
+
 	listen := c.String("listen")
 	log.Info("Listening on ", listen)
 	log.Fatal(http.ListenAndServe(listen, router))
 	return nil
+}
+
+// CLI Handlers
+func clientShowOnce() error {
+	r, err := collect()
+	if err != nil {
+		return cli.NewExitError(err.Error(), 1)
+	}
+
+	str, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return cli.NewExitError(err.Error(), 1)
+	}
+
+	fmt.Print(string(str))
+	fmt.Print("\n")
+	return cli.NewExitError("", 0)
 }
 
 // HTTP Handlers
@@ -140,12 +171,12 @@ func clientShow(w http.ResponseWriter, req *http.Request) {
 }
 
 func clientReload(w http.ResponseWriter, req *http.Request) {
-	respondSuccess(w, req, "OK")
+	w.Write([]byte("ok"))
 }
 
 func clientReport(w http.ResponseWriter, req *http.Request) {
 	report()
-	respondSuccess(w, req, "OK")
+	w.Write([]byte("ok"))
 }
 
 func report() {
@@ -183,7 +214,7 @@ func collect() (record.Record, error) {
 
 	r := record.Record{}
 	r["r"] = RECORD_VERSION
-	r["ts"] = time.Now()
+	r["ts"] = time.Now().UTC().Format(time.RFC3339)
 
 	opt := collector.CollectorOpts{
 		Client: client,
@@ -192,4 +223,21 @@ func collect() (record.Record, error) {
 	collector.Run(&r, &opt)
 
 	return r, nil
+}
+
+func isExisting() bool {
+	want := strconv.Itoa(RECORD_VERSION)
+	have := ""
+
+	data, err := ioutil.ReadFile(EXISTING_FILE)
+	if err == nil {
+		have = string(data)
+	}
+
+	if want == have {
+		return true
+	} else {
+		ioutil.WriteFile(EXISTING_FILE, []byte(want), 0644)
+		return false
+	}
 }
