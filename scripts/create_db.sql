@@ -13,5 +13,6 @@ CREATE TABLE installation (
   first_seen timestamp,
   last_seen timestamp,
   last_ip varchar(255),
-  last_record int REFERENCES record(id)
+  last_record int REFERENCES record(id),
+  note text
 );
