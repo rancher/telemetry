@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ type ApiInstallation struct {
 	Uid       string      `json:"uid"`
 	FirstSeen time.Time   `json:"first_seen"`
 	LastSeen  time.Time   `json:"last_seen"`
+	LastIp    string      `json:"last_ip"`
 	Record    interface{} `json:"record"`
 }
 
@@ -38,6 +40,9 @@ type ApiRecord struct {
 
 type RecordsByUid map[string]ApiRecord
 type RecordsByDateByUid map[string]RecordsByUid
+
+type AggregatedFields map[string]int64
+type AggregatedFieldsByDate map[string]AggregatedFields
 
 func NewPostgres(c *cli.Context) *Postgres {
 	host := c.String("pg-host")
@@ -144,9 +149,12 @@ func (p *Postgres) upsertInstall(uid string, clientIp string, recordId int) (int
 	return id, err
 }
 
-func (p *Postgres) GetLatest(hours int) ([]ApiInstallation, error) {
+// ----------------------
+// Queries for Admin API
+// ----------------------
+func (p *Postgres) GetActiveInstalls(hours int) ([]ApiInstallation, error) {
 	sql := `
-		SELECT i.id, i.uid, i.first_seen, i.last_seen, r.data
+		SELECT i.id, i.uid, i.first_seen, i.last_seen, i.last_ip, r.data
 		FROM installation i
 			JOIN record r ON (i.last_record = r.id)
 		WHERE i.last_seen >= NOW() - INTERVAL '%d hour'`
@@ -165,7 +173,7 @@ func (p *Postgres) GetLatest(hours int) ([]ApiInstallation, error) {
 	for rows.Next() {
 		var i ApiInstallation
 		var data []byte
-		err = rows.Scan(&i.Id, &i.Uid, &i.FirstSeen, &i.LastSeen, &data)
+		err = rows.Scan(&i.Id, &i.Uid, &i.FirstSeen, &i.LastSeen, &i.LastIp, &data)
 		if err != nil {
 			return nil, err
 		}
@@ -181,14 +189,14 @@ func (p *Postgres) GetLatest(hours int) ([]ApiInstallation, error) {
 	return out, nil
 }
 
-func (p *Postgres) GetByDay(hours int) (RecordsByDateByUid, error) {
+func (p *Postgres) GetRecordsGroupedByDay(days int) (RecordsByDateByUid, error) {
 	sql := `
 		SELECT id, uid, ts, data
 		FROM record
-		WHERE ts >= NOW() - INTERVAL '%d hour'
+		WHERE date_trunc('day',ts) >= (date_trunc('day',now()) - INTERVAL '%d day')
 		ORDER BY id DESC`
 
-	rows, err := p.Conn.Query(fmt.Sprintf(sql, hours))
+	rows, err := p.Conn.Query(fmt.Sprintf(sql, days))
 
 	defer rows.Close()
 
@@ -196,7 +204,7 @@ func (p *Postgres) GetByDay(hours int) (RecordsByDateByUid, error) {
 		return nil, err
 	}
 
-	days := make(RecordsByDateByUid)
+	out := make(RecordsByDateByUid)
 
 	defer rows.Close()
 	for rows.Next() {
@@ -213,10 +221,10 @@ func (p *Postgres) GetByDay(hours int) (RecordsByDateByUid, error) {
 		}
 
 		day := rec.Ts.Format("2006-01-02")
-		byDate, ok := days[day]
+		byDate, ok := out[day]
 		if !ok {
 			byDate = make(RecordsByUid)
-			days[day] = byDate
+			out[day] = byDate
 		}
 
 		_, exists := byDate[rec.Uid]
@@ -225,18 +233,18 @@ func (p *Postgres) GetByDay(hours int) (RecordsByDateByUid, error) {
 		}
 	}
 
-	return days, nil
+	return out, nil
 }
 
-func (p *Postgres) GetRecordsByUid(uid string, hours int) ([]ApiRecord, error) {
+func (p *Postgres) GetRecordsByUid(uid string, days int) ([]ApiRecord, error) {
 	sql := `
 		SELECT id, uid, ts, data
 		FROM record
 		WHERE 
 			uid = $1
-			AND ts >= NOW() - INTERVAL '%d hour'`
+		  AND date_trunc('day',ts) >= (date_trunc('day',now()) - INTERVAL '%d day')`
 
-	rows, err := p.Conn.Query(fmt.Sprintf(sql, hours), uid)
+	rows, err := p.Conn.Query(fmt.Sprintf(sql, days), uid)
 
 	if err != nil {
 		return nil, err
@@ -285,4 +293,66 @@ func (p *Postgres) GetRecordById(id string) (ApiRecord, error) {
 	}
 
 	return rec, nil
+}
+
+func (p *Postgres) SumOfActiveInstalls(hours int, fields []string) (AggregatedFieldsByDate, error) {
+	validField := regexp.MustCompile("^[a-zA-Z0-9._-]+$")
+
+	sql := "SELECT\n"
+
+	for idx, field := range fields {
+		if !validField.MatchString(field) {
+			return nil, errors.New("Invalid field")
+		}
+
+		parts := strings.Split(field, ".")
+		if idx != 0 {
+			str += ",\n"
+		}
+		sql += "sum(json_extract_path(r.data,'" + strings.Join(parts, "','") + "')::text::int) AS \"" + field + "\""
+	}
+
+	sql += `
+FROM installation i
+	JOIN record r ON (i.last_record = r.id)
+WHERE i.last_seen >= NOW() - INTERVAL '%d hour'`
+
+	sql = fmt.Sprintf(sql, hours)
+
+	log.Debugf("SQL: %s", sql)
+
+	rows, err := p.Conn.Query(sql)
+	defer rows.Close()
+
+	if err != nil {
+		return nil, err
+	}
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(AggregatedFieldsByDate)
+	vals := make([]interface{}, len(cols))
+	for i := 0; i < len(cols); i++ {
+		vals[i] = new(interface{})
+	}
+
+	for rows.Next() {
+		err = rows.Scan(vals...)
+		if err != nil {
+			return nil, err
+		}
+
+		day := (*(vals[len(cols)-1].(*interface{}))).(string)
+		entry := make(AggregatedFields)
+		for i := 0; i < len(cols)-1; i++ {
+			entry[fields[i]] = (*(vals[i].(*interface{}))).(int64)
+		}
+
+		out[day] = entry
+	}
+
+	return out, nil
 }

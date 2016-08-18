@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"strconv"
 
 	log "github.com/Sirupsen/logrus"
@@ -123,10 +125,11 @@ func serverRun(c *cli.Context) error {
 		log.Warn("admin-{key,-secret} not set, admin disabled")
 	} else {
 		admin := mux.NewRouter()
-		admin.HandleFunc("/admin/latest", adminApiLatest)
-		admin.HandleFunc("/admin/by-day", adminApiByDay)
-		admin.HandleFunc("/admin/install/{uid}", adminApiByUid)
-		admin.HandleFunc("/admin/record/{id}", adminApiByRecordId)
+		admin.HandleFunc("/admin/latest", apiLatest)
+		admin.HandleFunc("/admin/latest-counts", apiLatestCounts)
+		admin.HandleFunc("/admin/by-day", apiRecordsByDay)
+		admin.HandleFunc("/admin/install/{uid}", apiInstallByUid)
+		admin.HandleFunc("/admin/record/{id}", apiRecordById)
 		authed := httpauth.SimpleBasicAuth(user, pass)(admin)
 
 		router.Handle("/admin", authed)
@@ -200,22 +203,14 @@ func serverPublish(w http.ResponseWriter, req *http.Request) {
 
 // ------------
 
-func adminApiLatest(w http.ResponseWriter, req *http.Request) {
-	hours := 7
-	hourStr := req.URL.Query().Get("hours")
-	if hourStr != "" {
-		hourInt, err := strconv.Atoi(hourStr)
-		if err == nil {
-			hours = hourInt
-		}
-	}
-
-	if hours < 1 {
-		respondError(w, req, "Hours is required", 422)
+func apiLatest(w http.ResponseWriter, req *http.Request) {
+	hours, err := getHours(req, 7)
+	if err != nil {
+		respondError(w, req, err.Error(), 422)
 		return
 	}
 
-	installs, err := dbPublisher.GetLatest(hours)
+	installs, err := dbPublisher.GetActiveInstalls(hours)
 	if err != nil {
 		respondError(w, req, err.Error(), 500)
 		return
@@ -230,22 +225,21 @@ func adminApiLatest(w http.ResponseWriter, req *http.Request) {
 	respondSuccess(w, req, coll)
 }
 
-func adminApiByDay(w http.ResponseWriter, req *http.Request) {
-	hours := 28 * 24
-	hourStr := req.URL.Query().Get("hours")
-	if hourStr != "" {
-		hourInt, err := strconv.Atoi(hourStr)
-		if err == nil {
-			hours = hourInt
-		}
-	}
-
-	if hours < 1 {
-		respondError(w, req, "Hours is required", 422)
+func apiLatestCounts(w http.ResponseWriter, req *http.Request) {
+	hours, err := getHours(req, 7)
+	if err != nil {
+		respondError(w, req, err.Error(), 422)
 		return
 	}
 
-	data, err := dbPublisher.GetByDay(hours)
+	str := req.URL.Query().Get("fields")
+	fields := strings.Split(str,",")
+
+	if len(fields) == 0
+		respondError(w, req, "You must provide some fields...", 422)
+	}
+
+	data, err := dbPublisher.SumOfActiveInstalls(hours, fields)
 	if err != nil {
 		respondError(w, req, err.Error(), 500)
 		return
@@ -254,30 +248,37 @@ func adminApiByDay(w http.ResponseWriter, req *http.Request) {
 	respondSuccess(w, req, data)
 }
 
-func adminApiByUid(w http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	uid := vars["uid"]
-
-	hours := 28 * 24
-	hourStr := req.URL.Query().Get("hours")
-	if hourStr != "" {
-		hourInt, err := strconv.Atoi(hourStr)
-		if err == nil {
-			hours = hourInt
-		}
+func apiRecordsByDay(w http.ResponseWriter, req *http.Request) {
+	days, err := getHours(req, 28)
+	if err != nil {
+		respondError(w, req, err.Error(), 422)
+		return
 	}
 
+	data, err := dbPublisher.GetRecordsGroupedByDay(days)
+	if err != nil {
+		respondError(w, req, err.Error(), 500)
+		return
+	}
+
+	respondSuccess(w, req, data)
+}
+
+func apiInstallByUid(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	uid := vars["uid"]
 	if uid == "" {
 		respondError(w, req, "UID is required", 422)
 		return
 	}
 
-	if hours < 1 {
-		respondError(w, req, "Hours is required", 422)
+	days, err := getHours(req, 28)
+	if err != nil {
+		respondError(w, req, err.Error(), 422)
 		return
 	}
 
-	records, err := dbPublisher.GetRecordsByUid(uid, hours)
+	records, err := dbPublisher.GetRecordsByUid(uid, days)
 	if err != nil {
 		respondError(w, req, err.Error(), 500)
 		return
@@ -292,7 +293,7 @@ func adminApiByUid(w http.ResponseWriter, req *http.Request) {
 	respondSuccess(w, req, coll)
 }
 
-func adminApiByRecordId(w http.ResponseWriter, req *http.Request) {
+func apiRecordById(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
 	id := vars["id"]
@@ -344,4 +345,40 @@ func anonymizeIp(in string) string {
 	}
 
 	return ip.Mask(mask).String()
+}
+
+func getHours(req *http.Request, def int) (int, error) {
+	out := def
+
+	str := req.URL.Query().Get("hours")
+	if str != "" {
+		num, err := strconv.Atoi(str)
+		if err == nil {
+			out = num
+		}
+	}
+
+	if out < 1 {
+		return 0, errors.New("Hours must be > 0")
+	} else {
+		return out, nil
+	}
+}
+
+func getDays(req *http.Request, def int) (int, error) {
+	out := def
+
+	str := req.URL.Query().Get("days")
+	if str != "" {
+		num, err := strconv.Atoi(str)
+		if err == nil {
+			out = num
+		}
+	}
+
+	if out < 1 {
+		return 0, errors.New("Days must be > 0")
+	} else {
+		return out, nil
+	}
 }
