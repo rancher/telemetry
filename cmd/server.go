@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -18,6 +19,7 @@ import (
 )
 
 var (
+	version         string
 	enableXff       bool
 	googlePublisher *publish.Google
 	dbPublisher     *publish.Postgres
@@ -105,6 +107,7 @@ func ServerCommand() cli.Command {
 func serverRun(c *cli.Context) error {
 	log.Infof("Telemetry Server %s", c.App.Version)
 
+	version = c.App.Version
 	googlePublisher = publish.NewGoogle(c)
 	dbPublisher = publish.NewPostgres(c)
 
@@ -112,6 +115,7 @@ func serverRun(c *cli.Context) error {
 	router.HandleFunc("/favicon.ico", http.NotFound)
 	router.HandleFunc("/healthcheck.html", serverCheck).Methods("GET")
 	router.HandleFunc("/publish", serverPublish).Methods("POST")
+	router.HandleFunc("/", serverRoot).Methods("GET")
 
 	user := c.String("admin-key")
 	pass := c.String("admin-secret")
@@ -129,16 +133,42 @@ func serverRun(c *cli.Context) error {
 		router.Handle("/admin/{_dummy:.*}", authed)
 	}
 
-	loggedRouter := handlers.LoggingHandler(os.Stdout, router)
+	cors := handlers.CORS(
+		handlers.AllowedHeaders([]string{"authorization"}),
+	)(router)
+
+	logged := handlers.LoggingHandler(os.Stdout, cors)
 
 	listen := c.String("listen")
 	log.Info("Listening on ", listen)
-	log.Fatal(http.ListenAndServe(listen, loggedRouter))
+	log.Fatal(http.ListenAndServe(listen, logged))
 	return nil
 }
 
 func serverCheck(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte("pageok"))
+}
+
+func serverRoot(w http.ResponseWriter, req *http.Request) {
+	str := `Rancher Telemetry %s
++-----------------------------------------------------------------+
+|                                                                 |
+|        XXX                                                      |
+|     XXX  XXX                                                    |
+| XXXX       XX                                                   |
+|XX           XX                                                  |
+|              XX                      XXXXXXXX                   |
+|               X                    XXX       XXXX             XX|
+|                X                 XXX            XXX         XXX |
+|                XX              XXX                XXXXXXXXXXX   |
+|                 XX            XX                                |
+|                  XX         XXX                                 |
+|                   XXX     XXX                                   |
+|                     XXXXXXX                                     |
+|                                                                 |
++-----------------------------------------------------------------+`
+
+	w.Write([]byte(fmt.Sprintf(str, version)))
 }
 
 func serverPublish(w http.ResponseWriter, req *http.Request) {
@@ -264,6 +294,7 @@ func adminApiByUid(w http.ResponseWriter, req *http.Request) {
 
 func adminApiByRecordId(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
+
 	id := vars["id"]
 
 	if id == "" {
