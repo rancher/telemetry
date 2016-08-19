@@ -125,14 +125,14 @@ func serverRun(c *cli.Context) error {
 		log.Warn("admin-{key,-secret} not set, admin disabled")
 	} else {
 		admin := mux.NewRouter()
-		admin.HandleFunc("/admin/installs", apiActiveInstalls)           // ?hours=7
-		admin.HandleFunc("/admin/counts", apiLatestCounts)               // ?hours=7&fields=foo,bar,baz
-		admin.HandleFunc("/admin/count-map", apiLatestCountMap)          // ?hours=7&field=foo
-		admin.HandleFunc("/admin/historical", apiHistoricalCounts)       // ?days=28&fields=foo,bar,baz
-		admin.HandleFunc("/admin/historical-map", apiHistoricalCountMap) // ?days=28&field=foo
-		admin.HandleFunc("/admin/by-day", apiRecordsByDay)               // ?days=28
-		admin.HandleFunc("/admin/installs/{uid}", apiInstallByUid)       // ?days=28
-		admin.HandleFunc("/admin/records/{id}", apiRecordById)           // nothing
+		admin.HandleFunc("/admin/installs", apiActiveInstalls)                   // ?hours=7
+		admin.HandleFunc("/admin/counts/{fields}", apiLatestCounts)              // ?hours=7
+		admin.HandleFunc("/admin/count-map/{field}", apiLatestCountMap)          // ?hours=7
+		admin.HandleFunc("/admin/historical/{fields}", apiHistoricalCounts)      // ?days=28
+		admin.HandleFunc("/admin/historical-map/{field}", apiHistoricalCountMap) // ?days=28
+		admin.HandleFunc("/admin/by-day", apiRecordsByDay)                       // ?days=28
+		admin.HandleFunc("/admin/installs/{uid}", apiInstallByUid)               // ?days=28
+		admin.HandleFunc("/admin/records/{id}", apiRecordById)                   // nothing
 		authed := httpauth.SimpleBasicAuth(user, pass)(admin)
 
 		router.Handle("/admin", authed)
@@ -235,10 +235,11 @@ func apiLatestCounts(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	str := req.URL.Query().Get("fields")
+	vars := mux.Vars(req)
+	str := vars["fields"]
 	fields := strings.Split(str, ",")
 
-	log.Debug("Fields: %s", fields)
+	log.Debugf("Fields: %s", fields)
 	if len(fields) == 0 {
 		respondError(w, req, "You must provide some fields...", 422)
 	}
@@ -259,8 +260,9 @@ func apiLatestCountMap(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	field := req.URL.Query().Get("field")
-	log.Debug("Field: %s", field)
+	vars := mux.Vars(req)
+	field := vars["field"]
+	log.Debugf("Field: %s", field)
 	if field == "" {
 		respondError(w, req, "You must provide a field...", 422)
 	}
@@ -281,10 +283,11 @@ func apiHistoricalCounts(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	str := req.URL.Query().Get("fields")
+	vars := mux.Vars(req)
+	str := vars["fields"]
 	fields := strings.Split(str, ",")
 
-	log.Debug("Fields: %s", fields)
+	log.Debugf("Fields: %s", fields)
 	if len(fields) == 0 {
 		respondError(w, req, "You must provide some fields...", 422)
 	}
@@ -305,8 +308,9 @@ func apiHistoricalCountMap(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	field := req.URL.Query().Get("field")
-	log.Debug("Field: %s", field)
+	vars := mux.Vars(req)
+	field := vars["field"]
+	log.Debugf("Field: %s", field)
 	if field == "" {
 		respondError(w, req, "You must provide a field...", 422)
 	}
