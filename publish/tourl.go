@@ -3,7 +3,8 @@ package publish
 import (
 	"bytes"
 	"encoding/json"
-
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -50,6 +51,16 @@ func (p *ToUrl) Report(r record.Record, clientIp string) error {
 	}
 
 	defer res.Body.Close()
-	_, err = ioutil.ReadAll(res.Body)
-	return err
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode >= 200 && res.StatusCode <= 299 {
+		log.Debugf(fmt.Sprintf("Server said %d: %s", res.StatusCode, body))
+		return nil
+	} else {
+		log.Errorf(fmt.Sprintf("Server said %d: %s", res.StatusCode, body))
+		return errors.New(fmt.Sprintf("Server returned %d", res.StatusCode))
+	}
 }

@@ -26,6 +26,7 @@ type MemoryInfo struct {
 }
 
 type Host struct {
+	Active     int        `json:"active"`
 	Count      int        `json:"count"`
 	Cpu        CpuInfo    `json:"cpu"`
 	Mem        MemoryInfo `json:"mem"`
@@ -79,6 +80,10 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 		}
 		utilFloat = utilFloat / float64(cores)
 		util = Round(utilFloat)
+
+		if host.AgentState == "active" && host.State == "active" {
+			h.Active += 1
+		}
 
 		h.Count += 1
 		h.Cpu.CoresMin = MinButNotZero(h.Cpu.CoresMin, cores)
@@ -135,7 +140,6 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 	for _, machine := range machineList.Data {
 		h.Driver.Increment(machine.Driver)
 	}
-	h.Driver["custom"] = Max(0, h.Count-len(machineList.Data))
 
 	return h
 }

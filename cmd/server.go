@@ -125,12 +125,14 @@ func serverRun(c *cli.Context) error {
 		log.Warn("admin-{key,-secret} not set, admin disabled")
 	} else {
 		admin := mux.NewRouter()
-		admin.HandleFunc("/admin/installs", apiActiveInstalls)     // ?hours=7
-		admin.HandleFunc("/admin/counts", apiLatestCounts)         // ?hours=7&fields=foo,bar,baz
-		admin.HandleFunc("/admin/historical", apiHistoricalCounts) // ?days=28*fields=foo,bar,baz
-		admin.HandleFunc("/admin/by-day", apiRecordsByDay)         // ?days=28
-		admin.HandleFunc("/admin/installs/{uid}", apiInstallByUid) // ?days=28
-		admin.HandleFunc("/admin/records/{id}", apiRecordById)     // nothing
+		admin.HandleFunc("/admin/installs", apiActiveInstalls)           // ?hours=7
+		admin.HandleFunc("/admin/counts", apiLatestCounts)               // ?hours=7&fields=foo,bar,baz
+		admin.HandleFunc("/admin/count-map", apiLatestCountMap)          // ?hours=7&field=foo
+		admin.HandleFunc("/admin/historical", apiHistoricalCounts)       // ?days=28&fields=foo,bar,baz
+		admin.HandleFunc("/admin/historical-map", apiHistoricalCountMap) // ?days=28&field=foo
+		admin.HandleFunc("/admin/by-day", apiRecordsByDay)               // ?days=28
+		admin.HandleFunc("/admin/installs/{uid}", apiInstallByUid)       // ?days=28
+		admin.HandleFunc("/admin/records/{id}", apiRecordById)           // nothing
 		authed := httpauth.SimpleBasicAuth(user, pass)(admin)
 
 		router.Handle("/admin", authed)
@@ -250,6 +252,28 @@ func apiLatestCounts(w http.ResponseWriter, req *http.Request) {
 	respondSuccess(w, req, data)
 }
 
+func apiLatestCountMap(w http.ResponseWriter, req *http.Request) {
+	hours, err := getHours(req, 7)
+	if err != nil {
+		respondError(w, req, err.Error(), 422)
+		return
+	}
+
+	field := req.URL.Query().Get("field")
+	log.Debug("Field: %s", field)
+	if field == "" {
+		respondError(w, req, "You must provide a field...", 422)
+	}
+
+	data, err := dbPublisher.SumOfActiveInstallsMap(hours, field)
+	if err != nil {
+		respondError(w, req, err.Error(), 500)
+		return
+	}
+
+	respondSuccess(w, req, data)
+}
+
 func apiHistoricalCounts(w http.ResponseWriter, req *http.Request) {
 	days, err := getDays(req, 28)
 	if err != nil {
@@ -266,6 +290,28 @@ func apiHistoricalCounts(w http.ResponseWriter, req *http.Request) {
 	}
 
 	data, err := dbPublisher.SumByDay(days, fields)
+	if err != nil {
+		respondError(w, req, err.Error(), 500)
+		return
+	}
+
+	respondSuccess(w, req, data)
+}
+
+func apiHistoricalCountMap(w http.ResponseWriter, req *http.Request) {
+	days, err := getDays(req, 28)
+	if err != nil {
+		respondError(w, req, err.Error(), 422)
+		return
+	}
+
+	field := req.URL.Query().Get("field")
+	log.Debug("Field: %s", field)
+	if field == "" {
+		respondError(w, req, "You must provide a field...", 422)
+	}
+
+	data, err := dbPublisher.SumByDayMap(days, field)
 	if err != nil {
 		respondError(w, req, err.Error(), 500)
 		return
