@@ -92,16 +92,38 @@ func (p *Postgres) Report(r record.Record, clientIp string) error {
 	install := r["install"].(map[string]interface{})
 	uid := install["uid"].(string)
 
-	recordId, err := p.addRecord(uid, r)
-	log.Debugf("Add Record: %s, %s", recordId, err)
+	tx, err := p.Conn.Begin()
 	if err != nil {
-		log.Debugf("Error writing to DB: %s", err)
+		log.Debugf("Error creating transaction: %s", err)
+		tx.Rollback()
 		return err
 	}
 
-	_, err = p.upsertInstall(uid, clientIp, recordId)
+	recordId, err := p.addRecord(tx, uid, r)
+	log.Debugf("Add Record: %s, %s", recordId, err)
 	if err != nil {
-		log.Debugf("Error writing to DB: %s", err)
+		log.Debugf("Error adding record: %s", err)
+		tx.Rollback()
+		return err
+	}
+
+	_, err = p.upsertInstall(tx, uid, clientIp, recordId)
+	if err != nil {
+		log.Debugf("Error updating install: %s", err)
+		return err
+	}
+
+	_, err = p.upsertByDay(tx, uid, recordId)
+	if err != nil {
+		log.Debugf("Error updating day: %s", err)
+		tx.Rollback()
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Debugf("Error commiting transatgion: %s", err)
+		tx.Rollback()
 		return err
 	}
 
@@ -123,7 +145,7 @@ func (p *Postgres) testDb() error {
 	return nil
 }
 
-func (p *Postgres) addRecord(uid string, r record.Record) (int, error) {
+func (p *Postgres) addRecord(tx *sql.Tx, uid string, r record.Record) (int, error) {
 	var id int
 
 	b, err := json.Marshal(r)
@@ -131,14 +153,14 @@ func (p *Postgres) addRecord(uid string, r record.Record) (int, error) {
 		return 0, err
 	}
 
-	err = p.Conn.QueryRow(`INSERT INTO record(uid,data,ts) VALUES ($1,$2,NOW()) RETURNING id`, uid, string(b)).Scan(&id)
+	err = tx.QueryRow(`INSERT INTO record(uid,data,ts) VALUES ($1,$2,NOW()) RETURNING id`, uid, string(b)).Scan(&id)
 	return id, err
 }
 
-func (p *Postgres) upsertInstall(uid string, clientIp string, recordId int) (int, error) {
+func (p *Postgres) upsertInstall(tx *sql.Tx, uid string, clientIp string, recordId int) (int, error) {
 	var id int
 
-	err := p.Conn.QueryRow(`
+	err := tx.QueryRow(`
 		INSERT INTO installation(uid,last_ip,last_record,first_seen,last_seen)
 		VALUES ($1,$2,$3,NOW(),NOW()) 
 		ON CONFLICT(uid) DO UPDATE SET 
@@ -146,6 +168,18 @@ func (p *Postgres) upsertInstall(uid string, clientIp string, recordId int) (int
 			last_ip=$2,
 			last_record=$3
 		RETURNING id`, uid, clientIp, recordId).Scan(&id)
+	return id, err
+}
+
+func (p *Postgres) upsertByDay(tx *sql.Tx, uid string, recordId int) (int, error) {
+	var id int
+
+	err := tx.QueryRow(`
+		INSERT INTO byday(uid,ts,record_id)
+		VALUES ($1,$2,$3) 
+		ON CONFLICT(uid,day) DO UPDATE SET 
+			record_id=$3
+		RETURNING id`, uid, recordId).Scan(&id)
 	return id, err
 }
 
@@ -295,29 +329,71 @@ func (p *Postgres) GetRecordById(id string) (ApiRecord, error) {
 	return rec, nil
 }
 
-func (p *Postgres) SumOfActiveInstalls(hours int, fields []string) (AggregatedFieldsByDate, error) {
-	validField := regexp.MustCompile("^[a-zA-Z0-9._-]+$")
-
-	sql := "SELECT\n"
-
-	for idx, field := range fields {
-		if !validField.MatchString(field) {
-			return nil, errors.New("Invalid field")
-		}
-
-		parts := strings.Split(field, ".")
-		if idx != 0 {
-			str += ",\n"
-		}
-		sql += "sum(json_extract_path(r.data,'" + strings.Join(parts, "','") + "')::text::int) AS \"" + field + "\""
+func (p *Postgres) SumOfActiveInstalls(hours int, fields []string) (AggregatedFields, error) {
+	fieldSql, err := fieldQuery(fields, "r.data")
+	if err != nil {
+		return nil, err
 	}
 
-	sql += `
+	sql := `SELECT
+	%s
 FROM installation i
 	JOIN record r ON (i.last_record = r.id)
 WHERE i.last_seen >= NOW() - INTERVAL '%d hour'`
 
-	sql = fmt.Sprintf(sql, hours)
+	sql = fmt.Sprintf(sql, fieldSql, hours)
+
+	log.Debugf("SQL: %s", sql)
+
+	rows, err := p.Conn.Query(sql)
+	defer rows.Close()
+
+	if err != nil {
+		return nil, err
+	}
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	out := make(AggregatedFields)
+	vals := make([]interface{}, len(cols))
+	for i := 0; i < len(cols); i++ {
+		vals[i] = new(interface{})
+	}
+
+	rows.Next()
+	err = rows.Scan(vals...)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < len(cols); i++ {
+		out[fields[i]] = (*(vals[i].(*interface{}))).(int64)
+	}
+
+	return out, nil
+}
+
+func (p *Postgres) SumByDay(days int, fields []string) (AggregatedFieldsByDate, error) {
+	sql := `SELECT
+	%s,
+	b.day
+FROM byday b
+	JOIN record r on (b.record_id=r.id)
+WHERE b.day >= (to_date('%s','YYYY-MM-DD') - INTERVAL '%d day')
+GROUP BY day
+ORDER BY day`
+
+	today := time.Now().Format("2006-01-02")
+
+	fieldSql, err := fieldQuery(fields, "r.data")
+	if err != nil {
+		return nil, err
+	}
+
+	sql = fmt.Sprintf(sql, fieldSql, today, days)
 
 	log.Debugf("SQL: %s", sql)
 
@@ -334,6 +410,7 @@ WHERE i.last_seen >= NOW() - INTERVAL '%d hour'`
 	}
 
 	out := make(AggregatedFieldsByDate)
+
 	vals := make([]interface{}, len(cols))
 	for i := 0; i < len(cols); i++ {
 		vals[i] = new(interface{})
@@ -345,14 +422,52 @@ WHERE i.last_seen >= NOW() - INTERVAL '%d hour'`
 			return nil, err
 		}
 
-		day := (*(vals[len(cols)-1].(*interface{}))).(string)
 		entry := make(AggregatedFields)
+
 		for i := 0; i < len(cols)-1; i++ {
-			entry[fields[i]] = (*(vals[i].(*interface{}))).(int64)
+			switch val := (*(vals[i].(*interface{}))).(type) {
+			case int64:
+				entry[fields[i]] = val
+			}
 		}
 
-		out[day] = entry
+		day := (*(vals[len(cols)-1].(*interface{}))).(time.Time)
+		dayStr := day.Format("2006-01-02")
+
+		out[dayStr] = entry
 	}
 
 	return out, nil
+}
+
+func fieldQuery(fields []string, dataField string) (string, error) {
+	validField := regexp.MustCompile("^[a-zA-Z0-9._-]+$")
+
+	out := []string{}
+
+	for _, field := range fields {
+		if !validField.MatchString(field) {
+			return "", errors.New("Invalid field")
+		}
+
+		parts := strings.Split(field, ".")
+		prefix := ""
+		fn := ""
+		suffix := ""
+		if strings.HasSuffix(field, "_min") {
+			fn = "min"
+		} else if strings.HasSuffix(field, "_avg") {
+			prefix = "round("
+			fn = "avg"
+			suffix = ")::int"
+		} else if strings.HasSuffix(field, "_max") {
+			fn = "max"
+		} else {
+			fn = "sum"
+		}
+
+		out = append(out, prefix+fn+"(json_extract_path("+dataField+",'"+strings.Join(parts, "','")+"')::text::int)"+suffix+" AS \""+field+"\"")
+	}
+
+	return strings.Join(out, ",\n"), nil
 }

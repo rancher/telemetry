@@ -34,7 +34,7 @@ func (out Container) Collect(c *CollectorOpts) interface{} {
 	out.Total = total
 
 	for _, container := range list.Data {
-		if container.State == "running" {
+		if container.State == "running" || container.State == "started-once" {
 			out.Running++
 		}
 		byHost.Increment(container.HostId)
