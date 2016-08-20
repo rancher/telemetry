@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/goji/httpauth"
@@ -108,6 +110,7 @@ func ServerCommand() cli.Command {
 
 func serverRun(c *cli.Context) error {
 	log.Infof("Telemetry Server %s", c.App.Version)
+	rand.Seed(time.Now().UnixNano())
 
 	version = c.App.Version
 	googlePublisher = publish.NewGoogle(c)
@@ -155,26 +158,100 @@ func serverCheck(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte("pageok"))
 }
 
-func serverRoot(w http.ResponseWriter, req *http.Request) {
-	str := `Rancher Telemetry %s
-+-----------------------------------------------------------------+
-|                                                                 |
-|        XXX                                                      |
-|     XXX  XXX                                                    |
-| XXXX       XX                                                   |
-|XX           XX                                                  |
-|              XX                      XXXXXXXX                   |
-|               X                    XXX       XXXX             XX|
-|                X                 XXX            XXX         XXX |
-|                XX              XXX                XXXXXXXXXXX   |
-|                 XX            XX                                |
-|                  XX         XXX                                 |
-|                   XXX     XXX                                   |
-|                     XXXXXXX                                     |
-|                                                                 |
-+-----------------------------------------------------------------+`
+func abs(i int) int {
+	if i < 0 {
+		return -1 * i
+	}
 
-	w.Write([]byte(fmt.Sprintf(str, version)))
+	return i
+}
+
+func min(i, j int) int {
+	if i < j {
+		return i
+	}
+	return j
+}
+
+func max(i, j int) int {
+	if i > j {
+		return i
+	}
+	return j
+}
+
+func clamp(i, x, j int) int {
+	return max(i, min(x, j))
+}
+
+func round(f float64) int {
+	return int(f + 0.5)
+}
+
+func serverRoot(w http.ResponseWriter, req *http.Request) {
+	nRows := 15
+	nCols := 80
+
+	var rows [][]byte
+	for y := 0; y < nRows; y++ {
+		rows = append(rows, make([]byte, nCols+1, nCols+1))
+
+		for x := 0; x <= nCols; x++ {
+			if x == 0 || x == nCols-1 {
+				rows[y][x] = '|'
+			} else if x == nCols {
+				rows[y][x] = '\n'
+			} else {
+				rows[y][x] = ' '
+			}
+		}
+	}
+
+	y := nRows / 2
+	ly := y
+	dy := 0.0
+	for x := 3; x < nCols-2; x++ {
+		log.Debugf("y=%d, ly=%d, dy=%f", y, ly, dy)
+		rows[y][x] = 'X'
+		rows[y][x-1] = 'X'
+		diff := abs(ly - y)
+		y1 := min(ly, y) + 1
+		y2 := max(ly, y)
+		if diff > 1 {
+			for z := y1; z < y2; z++ {
+				rows[z][x] = 'X'
+				rows[z][x-1] = 'X'
+			}
+		}
+
+		dy += float64(rand.Int()%10)/10.0 - 0.5
+		if dy < -2.0 {
+			dy = -2.0
+		} else if dy > 2.0 {
+			dy = 2.0
+		}
+
+		ly = y
+		y = round(float64(y) + dy)
+		if y < 0 {
+			y = 0
+			dy = -dy
+		} else if y > nRows-1 {
+			y = nRows - 1
+			dy = -dy
+		}
+	}
+
+	w.Write([]byte(fmt.Sprintf("Rancher Telemetry %s\n", version)))
+	w.Write([]byte("+" + strings.Repeat("-", nCols-2) + "+\n"))
+	w.Write([]byte("|" + strings.Repeat(" ", nCols-2) + "|\n"))
+
+	for _, row := range rows {
+		w.Write(row)
+	}
+
+	w.Write([]byte("|" + strings.Repeat(" ", nCols-2) + "|\n"))
+	w.Write([]byte("+" + strings.Repeat("-", nCols-2) + "+\n"))
 }
 
 func serverPublish(w http.ResponseWriter, req *http.Request) {
