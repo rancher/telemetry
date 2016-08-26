@@ -22,12 +22,25 @@ import (
 	record "github.com/rancher/telemetry/record"
 )
 
+const DEF_HOURS = 7
+const DEF_DAYS = 28
+
 var (
 	version         string
 	enableXff       bool
 	googlePublisher *publish.Google
 	dbPublisher     *publish.Postgres
 )
+
+type RequiredOptions []string
+
+type RequestOpts struct {
+	Hours  int
+	Days   int
+	Uid    string
+	Fields []string
+	Field  string
+}
 
 func ServerCommand() cli.Command {
 	return cli.Command{
@@ -128,14 +141,25 @@ func serverRun(c *cli.Context) error {
 		log.Warn("admin-{key,-secret} not set, admin disabled")
 	} else {
 		admin := mux.NewRouter()
-		admin.HandleFunc("/admin/installs", apiActiveInstalls)                   // ?hours=7
-		admin.HandleFunc("/admin/counts/{fields}", apiLatestCounts)              // ?hours=7
-		admin.HandleFunc("/admin/count-map/{field}", apiLatestCountMap)          // ?hours=7
-		admin.HandleFunc("/admin/historical/{fields}", apiHistoricalCounts)      // ?days=28
-		admin.HandleFunc("/admin/historical-map/{field}", apiHistoricalCountMap) // ?days=28
-		admin.HandleFunc("/admin/by-day", apiRecordsByDay)                       // ?days=28
-		admin.HandleFunc("/admin/installs/{uid}", apiInstallByUid)               // ?days=28
-		admin.HandleFunc("/admin/records/{id}", apiRecordById)                   // nothing
+		//	admin.HandleFunc("/admin/net-installs", ...)                                // ?days=28
+
+		admin.HandleFunc("/admin/active", apiActive)                       // ?hours=7
+		admin.HandleFunc("/admin/active/fields/{fields}", apiActiveFields) // ?hours=7
+		admin.HandleFunc("/admin/active/map/{field}", apiActiveMap)        // ?hours=7
+		admin.HandleFunc("/admin/active/value/{field}", apiActiveValue)    // ?hours=7
+
+		admin.HandleFunc("/admin/history", apiHistory)                       // ?days=28
+		admin.HandleFunc("/admin/history/fields/{fields}", apiHistoryFields) // ?days=28
+		admin.HandleFunc("/admin/history/map/{field}", apiHistoryMap)        // ?days=28
+		admin.HandleFunc("/admin/history/value/{field}", apiHistoryValue)    // ?days=28
+
+		admin.HandleFunc("/admin/installs/{uid}", apiInstallByUid)                  // ?days=28
+		admin.HandleFunc("/admin/installs/{uid}/fields/{fields}", apiInstallFields) // ?days=28
+		admin.HandleFunc("/admin/installs/{uid}/map/{field}", apiInstallMap)        // ?days=28
+		admin.HandleFunc("/admin/installs/{uid}/value/{field}", apiInstallValue)    // ?days=28
+
+		admin.HandleFunc("/admin/records/{id}", apiRecordById) // nothing
+
 		authed := httpauth.SimpleBasicAuth(user, pass)(admin)
 
 		router.Handle("/admin", authed)
@@ -282,15 +306,94 @@ func serverPublish(w http.ResponseWriter, req *http.Request) {
 }
 
 // ------------
+// Counts
+// ------------
+func getFields(w http.ResponseWriter, req *http.Request, which string) {
+	var out interface{}
+	var err error
 
-func apiActiveInstalls(w http.ResponseWriter, req *http.Request) {
-	hours, err := getHours(req, 7)
+	opt, err := getOptions(req, RequiredOptions{"Fields"})
 	if err != nil {
 		respondError(w, req, err.Error(), 422)
 		return
 	}
 
-	installs, err := dbPublisher.GetActiveInstalls(hours)
+	switch which {
+	case "active":
+		out, err = dbPublisher.SumOfActiveInstalls(opt.Hours, opt.Fields)
+	case "history":
+		out, err = dbPublisher.SumByDay(opt.Days, opt.Fields, "")
+	case "install":
+		out, err = dbPublisher.SumByDay(opt.Days, opt.Fields, opt.Uid)
+	default:
+		respondError(w, req, "Invalid which", 400)
+		return
+	}
+
+	respond(w, req, out, err)
+}
+
+func getMap(w http.ResponseWriter, req *http.Request, which string) {
+	var out interface{}
+	var err error
+
+	opt, err := getOptions(req, RequiredOptions{"Field"})
+	if err != nil {
+		respondError(w, req, err.Error(), 422)
+		return
+	}
+
+	switch which {
+	case "active":
+		out, err = dbPublisher.SumOfActiveInstallsMap(opt.Hours, opt.Field)
+	case "history":
+		out, err = dbPublisher.SumByDayMap(opt.Days, opt.Field, "")
+	case "install":
+		out, err = dbPublisher.SumByDayMap(opt.Days, opt.Field, opt.Uid)
+	default:
+		respondError(w, req, "Invalid which", 400)
+		return
+	}
+
+	respond(w, req, out, err)
+}
+
+func getValue(w http.ResponseWriter, req *http.Request, which string) {
+	var out interface{}
+	var err error
+
+	opt, err := getOptions(req, RequiredOptions{"Field"})
+	if err != nil {
+		respondError(w, req, err.Error(), 422)
+		return
+	}
+
+	switch which {
+	case "active":
+		out, err = dbPublisher.SumOfActiveInstallsValue(opt.Hours, opt.Field)
+	case "history":
+		out, err = dbPublisher.SumByDayValue(opt.Days, opt.Field, "")
+	case "install":
+		out, err = dbPublisher.SumByDayValue(opt.Days, opt.Field, opt.Uid)
+	default:
+		respondError(w, req, "Invalid which", 400)
+		return
+	}
+
+	respond(w, req, out, err)
+}
+
+// ------------
+// Active
+// ------------
+func apiActive(w http.ResponseWriter, req *http.Request) {
+	opt, err := getOptions(req, RequiredOptions{})
+	if err != nil {
+		respondError(w, req, err.Error(), 422)
+		return
+	}
+
+	installs, err := dbPublisher.GetActiveInstalls(opt.Hours)
 	if err != nil {
 		respondError(w, req, err.Error(), 500)
 		return
@@ -305,133 +408,51 @@ func apiActiveInstalls(w http.ResponseWriter, req *http.Request) {
 	respondSuccess(w, req, coll)
 }
 
-func apiLatestCounts(w http.ResponseWriter, req *http.Request) {
-	hours, err := getHours(req, 7)
+func apiActiveFields(w http.ResponseWriter, req *http.Request) {
+	getFields(w, req, "active")
+}
+
+func apiActiveMap(w http.ResponseWriter, req *http.Request) {
+	getMap(w, req, "active")
+}
+
+func apiActiveValue(w http.ResponseWriter, req *http.Request) {
+	getValue(w, req, "active")
+}
+
+// ------------
+// History
+// ------------
+func apiHistory(w http.ResponseWriter, req *http.Request) {
+	opt, err := getOptions(req, RequiredOptions{})
 	if err != nil {
 		respondError(w, req, err.Error(), 422)
 		return
 	}
 
-	vars := mux.Vars(req)
-	str := vars["fields"]
-	fields := strings.Split(str, ",")
-
-	log.Debugf("Fields: %s", fields)
-	if len(fields) == 0 {
-		respondError(w, req, "You must provide some fields...", 422)
-	}
-
-	data, err := dbPublisher.SumOfActiveInstalls(hours, fields)
-	if err != nil {
-		respondError(w, req, err.Error(), 500)
-		return
-	}
-
-	respondSuccess(w, req, data)
+	out, err := dbPublisher.GetRecordsGroupedByDay(opt.Days)
+	respond(w, req, out, err)
 }
 
-func apiLatestCountMap(w http.ResponseWriter, req *http.Request) {
-	hours, err := getHours(req, 7)
-	if err != nil {
-		respondError(w, req, err.Error(), 422)
-		return
-	}
-
-	vars := mux.Vars(req)
-	field := vars["field"]
-	log.Debugf("Field: %s", field)
-	if field == "" {
-		respondError(w, req, "You must provide a field...", 422)
-	}
-
-	data, err := dbPublisher.SumOfActiveInstallsMap(hours, field)
-	if err != nil {
-		respondError(w, req, err.Error(), 500)
-		return
-	}
-
-	respondSuccess(w, req, data)
+func apiHistoryFields(w http.ResponseWriter, req *http.Request) {
+	getFields(w, req, "history")
 }
 
-func apiHistoricalCounts(w http.ResponseWriter, req *http.Request) {
-	days, err := getDays(req, 28)
-	if err != nil {
-		respondError(w, req, err.Error(), 422)
-		return
-	}
-
-	vars := mux.Vars(req)
-	str := vars["fields"]
-	fields := strings.Split(str, ",")
-
-	log.Debugf("Fields: %s", fields)
-	if len(fields) == 0 {
-		respondError(w, req, "You must provide some fields...", 422)
-	}
-
-	data, err := dbPublisher.SumByDay(days, fields)
-	if err != nil {
-		respondError(w, req, err.Error(), 500)
-		return
-	}
-
-	respondSuccess(w, req, data)
+func apiHistoryMap(w http.ResponseWriter, req *http.Request) {
+	getMap(w, req, "history")
 }
 
-func apiHistoricalCountMap(w http.ResponseWriter, req *http.Request) {
-	days, err := getDays(req, 28)
-	if err != nil {
-		respondError(w, req, err.Error(), 422)
-		return
-	}
-
-	vars := mux.Vars(req)
-	field := vars["field"]
-	log.Debugf("Field: %s", field)
-	if field == "" {
-		respondError(w, req, "You must provide a field...", 422)
-	}
-
-	data, err := dbPublisher.SumByDayMap(days, field)
-	if err != nil {
-		respondError(w, req, err.Error(), 500)
-		return
-	}
-
-	respondSuccess(w, req, data)
+func apiHistoryValue(w http.ResponseWriter, req *http.Request) {
+	getValue(w, req, "history")
 }
 
-func apiRecordsByDay(w http.ResponseWriter, req *http.Request) {
-	days, err := getDays(req, 28)
-	if err != nil {
-		respondError(w, req, err.Error(), 422)
-		return
-	}
-
-	data, err := dbPublisher.GetRecordsGroupedByDay(days)
-	if err != nil {
-		respondError(w, req, err.Error(), 500)
-		return
-	}
-
-	respondSuccess(w, req, data)
-}
-
+// ------------
+// By Install
+// ------------
 func apiInstallByUid(w http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	uid := vars["uid"]
-	if uid == "" {
-		respondError(w, req, "UID is required", 422)
-		return
-	}
+	opt, err := getOptions(req, RequiredOptions{"Uid"})
 
-	days, err := getDays(req, 28)
-	if err != nil {
-		respondError(w, req, err.Error(), 422)
-		return
-	}
-
-	records, err := dbPublisher.GetRecordsByUid(uid, days)
+	records, err := dbPublisher.GetRecordsByUid(opt.Uid, opt.Days)
 	if err != nil {
 		respondError(w, req, err.Error(), 500)
 		return
@@ -446,6 +467,21 @@ func apiInstallByUid(w http.ResponseWriter, req *http.Request) {
 	respondSuccess(w, req, coll)
 }
 
+func apiInstallFields(w http.ResponseWriter, req *http.Request) {
+	getFields(w, req, "install")
+}
+
+func apiInstallMap(w http.ResponseWriter, req *http.Request) {
+	getMap(w, req, "install")
+}
+
+func apiInstallValue(w http.ResponseWriter, req *http.Request) {
+	getValue(w, req, "install")
+}
+
+// ------------
+// By Record
+// ------------
 func apiRecordById(w http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
@@ -456,13 +492,8 @@ func apiRecordById(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	record, err := dbPublisher.GetRecordById(id)
-	if err != nil {
-		respondError(w, req, err.Error(), 500)
-		return
-	}
-
-	respondSuccess(w, req, record)
+	out, err := dbPublisher.GetRecordById(id)
+	respond(w, req, out, err)
 }
 
 func adminUi(w http.ResponseWriter, req *http.Request) {
@@ -500,38 +531,65 @@ func anonymizeIp(in string) string {
 	return ip.Mask(mask).String()
 }
 
-func getHours(req *http.Request, def int) (int, error) {
-	out := def
+func getOptions(req *http.Request, required RequiredOptions) (RequestOpts, error) {
+	out := RequestOpts{
+		Hours: DEF_HOURS,
+		Days:  DEF_DAYS,
+	}
 
 	str := req.URL.Query().Get("hours")
 	if str != "" {
 		num, err := strconv.Atoi(str)
 		if err == nil {
-			out = num
+			out.Hours = num
 		}
 	}
 
-	if out < 1 {
-		return 0, errors.New("Hours must be > 0")
-	} else {
-		return out, nil
-	}
-}
-
-func getDays(req *http.Request, def int) (int, error) {
-	out := def
-
-	str := req.URL.Query().Get("days")
+	str = req.URL.Query().Get("days")
 	if str != "" {
 		num, err := strconv.Atoi(str)
 		if err == nil {
-			out = num
+			out.Days = num
 		}
 	}
 
-	if out < 1 {
-		return 0, errors.New("Days must be > 0")
-	} else {
-		return out, nil
+	vars := mux.Vars(req)
+	out.Fields = strings.Split(vars["fields"], ",")
+	out.Field = vars["field"]
+	out.Uid = vars["uid"]
+
+	if out.Hours < 1 {
+		return out, errors.New("Hours must be > 0")
 	}
+
+	if out.Days < 1 {
+		return out, errors.New("Days must be > 0")
+	}
+
+	if required != nil {
+		if required.Contains("Uid") && len(out.Uid) == 0 {
+			return out, errors.New("You must provide a field")
+		}
+
+		if required.Contains("Fields") && len(out.Fields) == 0 {
+			return out, errors.New("You must provide some fields")
+		}
+
+		if required.Contains("Field") && out.Field == "" {
+			return out, errors.New("You must provide a field")
+		}
+	}
+
+	return out, nil
+}
+
+func (r *RequiredOptions) Contains(needle string) bool {
+	needle = strings.ToLower(needle)
+	for _, val := range *r {
+		if strings.ToLower(val) == needle {
+			return true
+		}
+	}
+
+	return false
 }

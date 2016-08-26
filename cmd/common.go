@@ -11,7 +11,7 @@ func respondError(w http.ResponseWriter, req *http.Request, msg string, statusCo
 	obj["type"] = "error"
 	obj["code"] = statusCode
 
-	bytes, err := json.Marshal(obj)
+	bytes, err := json.MarshalIndent(obj, "", "  ")
 	if err == nil {
 		http.Error(w, string(bytes), statusCode)
 	} else {
@@ -20,11 +20,19 @@ func respondError(w http.ResponseWriter, req *http.Request, msg string, statusCo
 }
 
 func respondSuccess(w http.ResponseWriter, req *http.Request, val interface{}) {
-	bytes, err := json.Marshal(val)
+	bytes, err := json.MarshalIndent(val, "", "  ")
 	if err == nil {
 		w.Write(bytes)
 	} else {
 		respondError(w, req, "Error serializing to JSON: "+err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func respond(w http.ResponseWriter, req *http.Request, val interface{}, err error) {
+	if err == nil {
+		respondSuccess(w, req, val)
+	} else {
+		respondError(w, req, err.Error(), 500)
 	}
 }
 

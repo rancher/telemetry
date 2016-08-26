@@ -39,17 +39,16 @@ FROM installation i
 	JOIN record r ON (i.last_record = r.id)
 WHERE i.last_seen >= NOW() - INTERVAL '%d hour'`
 
-	rows, err := p.Conn.Query(fmt.Sprintf(sql, hours))
-
-	defer rows.Close()
-
+	sql = fmt.Sprintf(sql, hours)
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	out := []ApiInstallation{}
 
-	defer rows.Close()
 	for rows.Next() {
 		var i ApiInstallation
 		var data []byte
@@ -75,17 +74,16 @@ FROM record
 WHERE date_trunc('day',ts) >= (date_trunc('day',now()) - INTERVAL '%d day')
 ORDER BY id DESC`
 
-	rows, err := p.Conn.Query(fmt.Sprintf(sql, days))
-
-	defer rows.Close()
-
+	sql = fmt.Sprintf(sql, days)
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	out := make(RecordsByDateByUid)
 
-	defer rows.Close()
 	for rows.Next() {
 		var rec ApiRecord
 		var data []byte
@@ -123,15 +121,16 @@ WHERE
 	AND date_trunc('day',ts) >= (date_trunc('day',now()) - INTERVAL '%d day')
 ORDER BY id DESC`
 
-	rows, err := p.Conn.Query(fmt.Sprintf(sql, days), uid)
-
+	sql = fmt.Sprintf(sql, days)
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql, uid)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	out := []ApiRecord{}
 
-	defer rows.Close()
 	for rows.Next() {
 		var rec ApiRecord
 		var data []byte
@@ -160,6 +159,7 @@ WHERE
 	var rec ApiRecord
 	var data []byte
 
+	log.Debugf("Query: %s", sql)
 	err := p.Conn.QueryRow(sql, id).Scan(&rec.Id, &rec.Uid, &rec.Ts, &data)
 	if err != nil {
 		return rec, err
@@ -186,15 +186,12 @@ FROM installation i
 WHERE i.last_seen >= NOW() - INTERVAL '%d hour'`
 
 	sql = fmt.Sprintf(sql, fieldSql, hours)
-
-	log.Debugf("SQL: %s", sql)
-
+	log.Debugf("Query: %s", sql)
 	rows, err := p.Conn.Query(sql)
-	defer rows.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	cols, err := rows.Columns()
 	if err != nil {
@@ -237,14 +234,12 @@ GROUP BY jet.key
 ORDER BY jet.key`
 
 	sql = fmt.Sprintf(sql, path, hours)
-	log.Debugf("SQL: %s", sql)
-
+	log.Debugf("Query: %s", sql)
 	rows, err := p.Conn.Query(sql)
-	defer rows.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	out := make(AggregatedFields)
 
@@ -263,13 +258,55 @@ ORDER BY jet.key`
 	return out, nil
 }
 
-func (p *Postgres) SumByDay(days int, fields []string) (AggregatedFieldsByDate, error) {
+func (p *Postgres) SumOfActiveInstallsValue(hours int, field string) (AggregatedFields, error) {
+	if !fieldIsValid(field) {
+		return nil, errors.New("Invalid field")
+	}
+
+	parts := strings.Split(field, ".")
+	path := "'" + strings.Join(parts, "','") + "'"
+
+	sql := `SELECT key, count(*) AS value 
+FROM installation i
+	JOIN record r ON (i.last_record = r.id),
+	json_extract_path_text(r.data,%s) AS key
+WHERE i.last_seen >= NOW() - INTERVAL '%d hour'
+GROUP BY key
+ORDER BY value DESC`
+
+	sql = fmt.Sprintf(sql, path, hours)
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(AggregatedFields)
+
+	for rows.Next() {
+		var key string
+		var val int64
+
+		err = rows.Scan(&key, &val)
+		if err != nil {
+			return nil, err
+		}
+
+		out[key] = val
+	}
+
+	return out, nil
+}
+
+func (p *Postgres) SumByDay(days int, fields []string, uid string) (AggregatedFieldsByDate, error) {
 	sql := `SELECT
 	%s,
 	b.day
 FROM byday b
 	JOIN record r on (b.record_id=r.id)
 WHERE b.day >= (to_date('%s','YYYY-MM-DD') - INTERVAL '%d day')
+	AND b.uid %s $1
 GROUP BY day
 ORDER BY day`
 
@@ -280,16 +317,18 @@ ORDER BY day`
 		return nil, err
 	}
 
-	sql = fmt.Sprintf(sql, fieldSql, today, days)
+	op := "="
+	if uid == "" {
+		op = "<>"
+	}
 
-	log.Debugf("SQL: %s", sql)
-
-	rows, err := p.Conn.Query(sql)
-	defer rows.Close()
-
+	sql = fmt.Sprintf(sql, fieldSql, today, days, op)
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql, uid)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	cols, err := rows.Columns()
 	if err != nil {
@@ -327,7 +366,7 @@ ORDER BY day`
 	return out, nil
 }
 
-func (p *Postgres) SumByDayMap(days int, field string) (AggregatedFieldsByDate, error) {
+func (p *Postgres) SumByDayMap(days int, field string, uid string) (AggregatedFieldsByDate, error) {
 	if !fieldIsValid(field) {
 		return nil, errors.New("Invalid field")
 	}
@@ -342,18 +381,80 @@ FROM byday b
 	JOIN record r ON (b.record_id = r.id),
 	json_each_text(json_extract_path(r.data,%s)) AS jet
 WHERE b.day >= (to_date('%s','YYYY-MM-DD') - INTERVAL '%d day')
+	AND b.uid %s $1
 GROUP BY b.day, jet.key
 ORDER BY b.day, jet.key`
 
-	sql = fmt.Sprintf(sql, path, today, days)
-	log.Debugf("SQL: %s", sql)
+	op := "="
+	if uid == "" {
+		op = "<>"
+	}
 
-	rows, err := p.Conn.Query(sql)
-	defer rows.Close()
-
+	sql = fmt.Sprintf(sql, path, today, days, op)
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql, uid)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
+
+	out := make(AggregatedFieldsByDate)
+
+	for rows.Next() {
+		var day time.Time
+		var key string
+		var val int64
+
+		err = rows.Scan(&day, &key, &val)
+
+		if err != nil {
+			return nil, err
+		}
+
+		dayStr := day.Format("2006-01-02")
+		byDate, ok := out[dayStr]
+		if !ok {
+			byDate = make(AggregatedFields)
+			out[dayStr] = byDate
+		}
+
+		byDate[key] = val
+	}
+
+	return out, nil
+}
+
+func (p *Postgres) SumByDayValue(days int, field string, uid string) (AggregatedFieldsByDate, error) {
+	if !fieldIsValid(field) {
+		return nil, errors.New("Invalid field")
+	}
+
+	today := time.Now().Format("2006-01-02")
+
+	parts := strings.Split(field, ".")
+	path := "'" + strings.Join(parts, "','") + "'"
+
+	sql := `SELECT b.day, key, count(*) AS value 
+FROM byday b
+	JOIN record r ON (b.record_id = r.id),
+	json_extract_path_text(r.data,%s) AS key
+WHERE b.day >= (to_date('%s','YYYY-MM-DD') - INTERVAL '%d day')
+	AND b.uid %s $1
+GROUP BY b.day, key
+ORDER BY b.day, value DESC`
+
+	op := "="
+	if uid == "" {
+		op = "<>"
+	}
+
+	sql = fmt.Sprintf(sql, path, today, days, op)
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql, uid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
 	out := make(AggregatedFieldsByDate)
 

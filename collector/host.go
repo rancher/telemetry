@@ -67,7 +67,11 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 		var utilFloat float64
 		var util int
 
-		info := host.Info.(map[string]interface{})
+		info, ok := host.Info.(map[string]interface{})
+		if !ok {
+			log.Debugf("  Skipping Host with no Info: %s", displayName(host))
+			continue
+		}
 		log.Debugf("  Host: %s", displayName(host))
 
 		// CPU
@@ -81,11 +85,6 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 		utilFloat = utilFloat / float64(cores)
 		util = Round(utilFloat)
 
-		if host.AgentState == "active" && host.State == "active" {
-			h.Active += 1
-		}
-
-		h.Count += 1
 		h.Cpu.CoresMin = MinButNotZero(h.Cpu.CoresMin, cores)
 		h.Cpu.CoresMax = Max(h.Cpu.CoresMin, cores)
 		h.Cpu.CoresTotal += cores
