@@ -21,24 +21,6 @@ type Postgres struct {
 	Conn *sql.DB
 }
 
-type ApiInstallation struct {
-	Id        int64       `json:"id"`
-	Uid       string      `json:"uid"`
-	FirstSeen time.Time   `json:"first_seen"`
-	LastSeen  time.Time   `json:"last_seen"`
-	Record    interface{} `json:"record"`
-}
-
-type ApiRecord struct {
-	Id     int64       `json:"id"`
-	Uid    string      `json:"uid"`
-	Ts     time.Time   `json:"ts"`
-	Record interface{} `json:"record"`
-}
-
-type RecordsByUid map[string]ApiRecord
-type RecordsByDateByUid map[string]RecordsByUid
-
 func NewPostgres(c *cli.Context) *Postgres {
 	host := c.String("pg-host")
 	port := c.String("pg-port")
@@ -87,16 +69,38 @@ func (p *Postgres) Report(r record.Record, clientIp string) error {
 	install := r["install"].(map[string]interface{})
 	uid := install["uid"].(string)
 
-	recordId, err := p.addRecord(uid, r)
-	log.Debugf("Add Record: %s, %s", recordId, err)
+	tx, err := p.Conn.Begin()
 	if err != nil {
-		log.Debugf("Error writing to DB: %s", err)
+		log.Errorf("Error creating transaction: %s", err)
+		tx.Rollback()
 		return err
 	}
 
-	_, err = p.upsertInstall(uid, clientIp, recordId)
+	recordId, err := p.addRecord(tx, uid, r)
+	log.Debugf("Add Record: %s, %s", recordId, err)
 	if err != nil {
-		log.Debugf("Error writing to DB: %s", err)
+		log.Errorf("Error adding record: %s", err)
+		tx.Rollback()
+		return err
+	}
+
+	_, err = p.upsertInstall(tx, uid, clientIp, recordId)
+	if err != nil {
+		log.Errorf("Error updating install: %s", err)
+		return err
+	}
+
+	_, err = p.upsertByDay(tx, uid, recordId)
+	if err != nil {
+		log.Errorf("Error updating day: %s", err)
+		tx.Rollback()
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Errorf("Error commiting transatcion: %s", err)
+		tx.Rollback()
 		return err
 	}
 
@@ -118,7 +122,7 @@ func (p *Postgres) testDb() error {
 	return nil
 }
 
-func (p *Postgres) addRecord(uid string, r record.Record) (int, error) {
+func (p *Postgres) addRecord(tx *sql.Tx, uid string, r record.Record) (int, error) {
 	var id int
 
 	b, err := json.Marshal(r)
@@ -126,14 +130,14 @@ func (p *Postgres) addRecord(uid string, r record.Record) (int, error) {
 		return 0, err
 	}
 
-	err = p.Conn.QueryRow(`INSERT INTO record(uid,data,ts) VALUES ($1,$2,NOW()) RETURNING id`, uid, string(b)).Scan(&id)
+	err = tx.QueryRow(`INSERT INTO record(uid,data,ts) VALUES ($1,$2,NOW()) RETURNING id`, uid, string(b)).Scan(&id)
 	return id, err
 }
 
-func (p *Postgres) upsertInstall(uid string, clientIp string, recordId int) (int, error) {
+func (p *Postgres) upsertInstall(tx *sql.Tx, uid string, clientIp string, recordId int) (int, error) {
 	var id int
 
-	err := p.Conn.QueryRow(`
+	err := tx.QueryRow(`
 		INSERT INTO installation(uid,last_ip,last_record,first_seen,last_seen)
 		VALUES ($1,$2,$3,NOW(),NOW()) 
 		ON CONFLICT(uid) DO UPDATE SET 
@@ -144,145 +148,16 @@ func (p *Postgres) upsertInstall(uid string, clientIp string, recordId int) (int
 	return id, err
 }
 
-func (p *Postgres) GetLatest(hours int) ([]ApiInstallation, error) {
-	sql := `
-		SELECT i.id, i.uid, i.first_seen, i.last_seen, r.data
-		FROM installation i
-			JOIN record r ON (i.last_record = r.id)
-		WHERE i.last_seen >= NOW() - INTERVAL '%d hour'`
+func (p *Postgres) upsertByDay(tx *sql.Tx, uid string, recordId int) (int, error) {
+	var id int
 
-	rows, err := p.Conn.Query(fmt.Sprintf(sql, hours))
+	today := time.Now().Format("2006-01-02")
 
-	defer rows.Close()
-
-	if err != nil {
-		return nil, err
-	}
-
-	out := []ApiInstallation{}
-
-	defer rows.Close()
-	for rows.Next() {
-		var i ApiInstallation
-		var data []byte
-		err = rows.Scan(&i.Id, &i.Uid, &i.FirstSeen, &i.LastSeen, &data)
-		if err != nil {
-			return nil, err
-		}
-
-		err = json.Unmarshal(data, &i.Record)
-		if err != nil {
-			return nil, err
-		}
-
-		out = append(out, i)
-	}
-
-	return out, nil
-}
-
-func (p *Postgres) GetByDay(hours int) (RecordsByDateByUid, error) {
-	sql := `
-		SELECT id, uid, ts, data
-		FROM record
-		WHERE ts >= NOW() - INTERVAL '%d hour'
-		ORDER BY id DESC`
-
-	rows, err := p.Conn.Query(fmt.Sprintf(sql, hours))
-
-	defer rows.Close()
-
-	if err != nil {
-		return nil, err
-	}
-
-	days := make(RecordsByDateByUid)
-
-	defer rows.Close()
-	for rows.Next() {
-		var rec ApiRecord
-		var data []byte
-		err = rows.Scan(&rec.Id, &rec.Uid, &rec.Ts, &data)
-		if err != nil {
-			return nil, err
-		}
-
-		err = json.Unmarshal(data, &rec.Record)
-		if err != nil {
-			return nil, err
-		}
-
-		day := rec.Ts.Format("2006-01-02")
-		byDate, ok := days[day]
-		if !ok {
-			byDate = make(RecordsByUid)
-			days[day] = byDate
-		}
-
-		_, exists := byDate[rec.Uid]
-		if !exists {
-			byDate[rec.Uid] = rec
-		}
-	}
-
-	return days, nil
-}
-
-func (p *Postgres) GetRecordsByUid(uid string, hours int) ([]ApiRecord, error) {
-	sql := `
-		SELECT id, uid, ts, data
-		FROM record
-		WHERE 
-			uid = $1
-			AND ts >= NOW() - INTERVAL '%d hour'`
-
-	rows, err := p.Conn.Query(fmt.Sprintf(sql, hours), uid)
-
-	if err != nil {
-		return nil, err
-	}
-
-	out := []ApiRecord{}
-
-	defer rows.Close()
-	for rows.Next() {
-		var rec ApiRecord
-		var data []byte
-		err = rows.Scan(&rec.Id, &rec.Uid, &rec.Ts, &data)
-		if err != nil {
-			return nil, err
-		}
-
-		err = json.Unmarshal(data, &rec.Record)
-		if err != nil {
-			return nil, err
-		}
-
-		out = append(out, rec)
-	}
-
-	return out, nil
-}
-
-func (p *Postgres) GetRecordById(id string) (ApiRecord, error) {
-	sql := `
-		SELECT id, uid, ts, data
-		FROM record
-		WHERE 
-			id = $1`
-
-	var rec ApiRecord
-	var data []byte
-
-	err := p.Conn.QueryRow(sql, id).Scan(&rec.Id, &rec.Uid, &rec.Ts, &data)
-	if err != nil {
-		return rec, err
-	}
-
-	err = json.Unmarshal(data, &rec.Record)
-	if err != nil {
-		return rec, err
-	}
-
-	return rec, nil
+	err := tx.QueryRow(`
+		INSERT INTO byday(uid,day,record_id)
+		VALUES ($1,$2,$3) 
+		ON CONFLICT(uid,day) DO UPDATE SET 
+			record_id=$3
+		RETURNING id`, uid, today, recordId).Scan(&id)
+	return id, err
 }

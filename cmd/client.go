@@ -108,9 +108,9 @@ func clientRun(c *cli.Context) error {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/favicon.ico", http.NotFound)
-	router.HandleFunc("/", clientShow).Methods("GET")
-	router.HandleFunc("/reload", clientReload).Methods("POST")
-	router.HandleFunc("/report", clientReport).Methods("POST")
+	router.HandleFunc("/v1-telemetry", clientShow).Methods("GET")
+	router.HandleFunc("/v1-telemetry/reload", clientReload).Methods("POST")
+	router.HandleFunc("/v1-telemetry/report", clientReport).Methods("POST")
 
 	interval := c.String("interval")
 	if interval != "" {
