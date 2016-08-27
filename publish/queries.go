@@ -33,6 +33,40 @@ type RecordsByDateByUid map[string]RecordsByUid
 type AggregatedFields map[string]int64
 type AggregatedFieldsByDate map[string]AggregatedFields
 
+func (p *Postgres) Ping() error {
+	sql := `SELECT 1`
+	var one int
+	err := p.Conn.QueryRow(sql).Scan(&one)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *Postgres) GetAllInstalls() ([]ApiInstallation, error) {
+	sql := `SELECT id, uid, first_seen, last_seen, i.last_ip FROM installation i ORDER BY first_seen`
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []ApiInstallation{}
+
+	for rows.Next() {
+		var i ApiInstallation
+		err = rows.Scan(&i.Id, &i.Uid, &i.FirstSeen, &i.LastSeen, &i.LastIp)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, i)
+	}
+
+	return out, nil
+}
+
 func (p *Postgres) GetActiveInstalls(hours int) ([]ApiInstallation, error) {
 	sql := `SELECT i.id, i.uid, i.first_seen, i.last_seen, i.last_ip, r.data
 FROM installation i
@@ -63,6 +97,33 @@ WHERE i.last_seen >= NOW() - INTERVAL '%d hour'`
 		}
 
 		out = append(out, i)
+	}
+
+	return out, nil
+}
+
+func (p *Postgres) GetActiveCountByDay() (AggregatedFields, error) {
+	sql := `SELECT date_trunc('day',ts) AS day, count(DISTINCT uid) FROM record GROUP BY day ORDER BY DAY`
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(AggregatedFields)
+
+	for rows.Next() {
+		var date time.Time
+		var count int64
+
+		err = rows.Scan(&date, &count)
+		if err != nil {
+			return nil, err
+		}
+
+		day := date.Format("2006-01-02")
+		out[day] = count
 	}
 
 	return out, nil
