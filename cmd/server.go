@@ -42,6 +42,15 @@ type RequestOpts struct {
 	Field  string
 }
 
+type InstallCounts struct {
+	Total  int64 `json:"total"`
+	Alive  int64 `json:"alive"`
+	Active int64 `json:"active"`
+	Born   int64 `json:"born"`
+	Died   int64 `json:"died"`
+}
+type InstallsByDay map[string]*InstallCounts
+
 func ServerCommand() cli.Command {
 	return cli.Command{
 		Name:   "server",
@@ -141,7 +150,6 @@ func serverRun(c *cli.Context) error {
 		log.Warn("admin-{key,-secret} not set, admin disabled")
 	} else {
 		admin := mux.NewRouter()
-		//	admin.HandleFunc("/admin/net-installs", ...)                                // ?days=28
 
 		admin.HandleFunc("/admin/active", apiActive)                       // ?hours=7
 		admin.HandleFunc("/admin/active/fields/{fields}", apiActiveFields) // ?hours=7
@@ -152,6 +160,7 @@ func serverRun(c *cli.Context) error {
 		admin.HandleFunc("/admin/history/fields/{fields}", apiHistoryFields) // ?days=28
 		admin.HandleFunc("/admin/history/map/{field}", apiHistoryMap)        // ?days=28
 		admin.HandleFunc("/admin/history/value/{field}", apiHistoryValue)    // ?days=28
+		admin.HandleFunc("/admin/history/installs", apiHistoryInstalls)
 
 		admin.HandleFunc("/admin/installs/{uid}", apiInstallByUid)                  // ?days=28
 		admin.HandleFunc("/admin/installs/{uid}/fields/{fields}", apiInstallFields) // ?days=28
@@ -179,6 +188,15 @@ func serverRun(c *cli.Context) error {
 }
 
 func serverCheck(w http.ResponseWriter, req *http.Request) {
+	checkDb := req.URL.Query().Get("db")
+	if checkDb == "true" {
+		err := dbPublisher.Ping()
+		if err != nil {
+			respondError(w, req, err.Error(), 500)
+			return
+		}
+	}
+
 	w.Write([]byte("pageok"))
 }
 
@@ -303,6 +321,85 @@ func serverPublish(w http.ResponseWriter, req *http.Request) {
 	}
 
 	respondSuccess(w, req, map[string]string{"ok": "1"})
+}
+
+// ------------
+// History
+// ------------
+func apiHistoryInstalls(w http.ResponseWriter, req *http.Request) {
+	installs, err := dbPublisher.GetAllInstalls()
+	if err != nil {
+		respondError(w, req, err.Error(), 500)
+		return
+	}
+
+	out := make(InstallsByDay)
+	today, _ := time.Parse("2006-01-02", time.Now().Format("2006-01-02"))
+
+	// First pass: Alive, born, died, and total from Installations
+	for _, inst := range installs {
+		firstStr := inst.FirstSeen.Format("2006-01-02")
+		lastStr := inst.LastSeen.Format("2006-01-02")
+
+		firstDay, err := time.Parse("2006-01-02", firstStr)
+		if err != nil {
+			log.Errorf("Invalid FirstSeen time on %d: %s", inst.Id, inst.FirstSeen)
+			continue
+		}
+
+		lastDay, err := time.Parse("2006-01-02", lastStr)
+		if err != nil {
+			log.Errorf("Invalid LastSeen time on %d: %s", inst.Id, inst.LastSeen)
+			continue
+		}
+		diedStr := lastDay.AddDate(0, 0, 1).Format("2006-01-02")
+
+		for t := firstDay; !t.After(today); t = t.AddDate(0, 0, 1) {
+			cur := t.Format("2006-01-02")
+
+			entry, ok := out[cur]
+			if !ok {
+				entry = &InstallCounts{}
+				out[cur] = entry
+			}
+
+			entry.Total++
+
+			if cur == firstStr {
+				log.Debugf("%d born on %s", inst.Id, cur)
+				entry.Born++
+
+			}
+
+			if cur == diedStr {
+				log.Debugf("%d died on %s", inst.Id, cur)
+				entry.Died++
+			}
+
+			if !t.After(lastDay) {
+				entry.Alive++
+			}
+		}
+	}
+
+	// Second pass: Active from Records
+	days, err := dbPublisher.GetActiveCountByDay()
+	if err != nil {
+		respondError(w, req, err.Error(), 500)
+		return
+	}
+
+	for day, val := range days {
+		entry, ok := out[day]
+		if !ok {
+			entry = &InstallCounts{}
+			out[day] = entry
+		}
+
+		entry.Active = val
+	}
+
+	respondSuccess(w, req, out)
 }
 
 // ------------
