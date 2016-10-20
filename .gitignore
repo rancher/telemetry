@@ -6,3 +6,4 @@
 /dist
 /telemetry
 /.existing
+node_modules
