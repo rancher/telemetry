@@ -52,6 +52,7 @@ func Clamp(min, x, max int) int {
 func NonRemoved() rancher.ListOpts {
 	filters := make(map[string]interface{})
 	filters["state_ne"] = "removed"
+	filters["limit"] = "-1"
 
 	out := rancher.ListOpts{
 		Filters: filters,

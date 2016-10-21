@@ -2,7 +2,6 @@ package collector
 
 import (
 	log "github.com/Sirupsen/logrus"
-	rancher "github.com/rancher/go-rancher/client"
 )
 
 type Environment struct {
@@ -15,13 +14,11 @@ func (s Environment) RecordKey() string {
 }
 
 func (out Environment) Collect(c *CollectorOpts) interface{} {
-	filters := make(map[string]interface{})
-	filters["all"] = "true"
+	opts := NonRemoved()
+	opts.Filters["all"] = "true"
 
 	log.Debug("Collecting Environment")
-	list, err := c.Client.Project.List(&rancher.ListOpts{
-		Filters: filters,
-	})
+	list, err := c.Client.Project.List(&opts)
 
 	if err != nil {
 		log.Errorf("Failed to get Environments err=%s", err)

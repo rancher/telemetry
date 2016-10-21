@@ -27,7 +27,7 @@ type MemoryInfo struct {
 
 type Host struct {
 	Active     int        `json:"active"`
-	Count      int        `json:"count"`
+	Total      int        `json:"total"`
 	Cpu        CpuInfo    `json:"cpu"`
 	Mem        MemoryInfo `json:"mem"`
 	Kernel     LabelCount `json:"kernel"`
@@ -73,6 +73,11 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 			continue
 		}
 		log.Debugf("  Host: %s", displayName(host))
+
+		h.Total++
+		if host.State == "active" {
+			h.Active++
+		}
 
 		// CPU
 		cpuInfo := info["cpuInfo"].(map[string]interface{})
