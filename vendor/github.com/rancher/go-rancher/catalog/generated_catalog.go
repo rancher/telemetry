@@ -9,6 +9,8 @@ type Catalog struct {
 
 	Actions map[string]interface{} `json:"actions,omitempty" yaml:"actions,omitempty"`
 
+	Branch string `json:"branch,omitempty" yaml:"branch,omitempty"`
+
 	CatalogRoot string `json:"catalogRoot,omitempty" yaml:"catalog_root,omitempty"`
 
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
@@ -30,7 +32,8 @@ type Catalog struct {
 
 type CatalogCollection struct {
 	Collection
-	Data []Catalog `json:"data,omitempty"`
+	Data   []Catalog `json:"data,omitempty"`
+	client *CatalogClient
 }
 
 type CatalogClient struct {
@@ -66,7 +69,18 @@ func (c *CatalogClient) Update(existing *Catalog, updates interface{}) (*Catalog
 func (c *CatalogClient) List(opts *ListOpts) (*CatalogCollection, error) {
 	resp := &CatalogCollection{}
 	err := c.rancherClient.doList(CATALOG_TYPE, opts, resp)
+	resp.client = c
 	return resp, err
+}
+
+func (cc *CatalogCollection) Next() (*CatalogCollection, error) {
+	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
+		resp := &CatalogCollection{}
+		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
+		resp.client = cc.client
+		return resp, err
+	}
+	return nil, nil
 }
 
 func (c *CatalogClient) ById(id string) (*Catalog, error) {
