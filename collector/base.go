@@ -1,7 +1,7 @@
 package collector
 
 import (
-	rancher "github.com/rancher/go-rancher/client"
+	rancher "github.com/rancher/go-rancher/v2"
 	"github.com/rancher/telemetry/record"
 )
 

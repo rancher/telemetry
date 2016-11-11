@@ -15,7 +15,7 @@ import:
   version: v1.1.0
 
 - package: github.com/rancher/go-rancher
-  version: bdb84801f2cf82be73e210ff586c531b07c83c42
+  version: af955cd2925739b199df4077fafaddfaa4834a2f
 
 - package: github.com/urfave/cli
   version: v1.18.0

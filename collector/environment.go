@@ -33,21 +33,12 @@ func (out Environment) Collect(c *CollectorOpts) interface{} {
 
 	for _, env := range list.Data {
 		// Enviornments can technically have more than one of these set...
-		found := false
-		if env.Kubernetes {
-			out.Orchestration.Increment("kubernetes")
-			found = true
-		} else if env.Swarm {
-			out.Orchestration.Increment("swarm")
-			found = true
-		} else if env.Mesos {
-			out.Orchestration.Increment("mesos")
-			found = true
+		orch := env.Orchestration
+		if len(orch) == 0 {
+			orch = "cattle"
 		}
 
-		if !found {
-			out.Orchestration.Increment("cattle")
-		}
+		out.Orchestration.Increment(orch)
 	}
 
 	return out

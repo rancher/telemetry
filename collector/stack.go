@@ -22,7 +22,7 @@ func (out Stack) Collect(c *CollectorOpts) interface{} {
 	nonRemoved := NonRemoved()
 
 	log.Debug("Collecting Stack")
-	list, err := c.Client.Environment.List(&nonRemoved)
+	list, err := c.Client.Stack.List(&nonRemoved)
 	if err != nil {
 		log.Errorf("Failed to get Stacks err=%s", err)
 		return nil
