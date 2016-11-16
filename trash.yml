@@ -6,7 +6,7 @@ import:
   version: 215affda49addc4c8ef7e2534915df2c8c35c6cd
 
 - package: github.com/gorilla/mux
-  version: 104068abd5cf50032c57aecbf2b8ce5b0a08a2cb
+  version: 757bef944d0f21880861c2dd9c871ca543023cba
 
 - package: github.com/gorilla/handlers
   version: a5775781a543af3c6b9f5baf10995e4d14168950
@@ -23,5 +23,11 @@ import:
 - package: github.com/lib/pq
   version: 80f8150043c80fb52dee6bc863a709cdac7ec8f8
 
-- package: github.com/goji/httpauth
-  version: 7308cdc89dd3eec2949a976ff1f32c07051e5733
+- package: github.com/abbot/go-http-auth
+  version: cb4372376e1e00e9f6ab9ec142e029302c9e7140
+
+- package: github.com/urfave/negroni
+  version: e0e50f7dc431c043cb33f91b09c3419d48b7cff5
+
+- package: golang.org/x/crypto/bcrypt
+  version: master

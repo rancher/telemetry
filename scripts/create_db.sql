@@ -27,3 +27,9 @@ CREATE TABLE byday (
 );
 
 CREATE UNIQUE INDEX byday_day_uid ON byday USING btree(day,uid);
+
+CREATE TABLE account (
+  id serial PRIMARY KEY,
+  name varchar(255) NOT NULL UNIQUE,
+  hash varchar(255)
+);

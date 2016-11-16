@@ -161,3 +161,13 @@ func (p *Postgres) upsertByDay(tx *sql.Tx, uid string, recordId int) (int, error
 		RETURNING id`, uid, today, recordId).Scan(&id)
 	return id, err
 }
+
+func (p *Postgres) GetAccountHash(user string) (string, error) {
+	var hash string
+	err := p.Conn.QueryRow(`SELECT hash FROM account WHERE name=$1`, user).Scan(&hash)
+	if err != nil {
+		return "", err
+	}
+
+	return hash, nil
+}
