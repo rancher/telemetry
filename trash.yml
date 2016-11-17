@@ -31,3 +31,9 @@ import:
 
 - package: golang.org/x/crypto/bcrypt
   version: master
+
+- package: golang.org/x/crypto/blowfish
+  version: master
+
+- package: golang.org/x/net/context
+  version: master
