@@ -9,6 +9,8 @@ type TemplateVersion struct {
 
 	Actions map[string]interface{} `json:"actions,omitempty" yaml:"actions,omitempty"`
 
+	Bindings map[string]interface{} `json:"bindings,omitempty" yaml:"bindings,omitempty"`
+
 	CatalogId string `json:"catalogId,omitempty" yaml:"catalog_id,omitempty"`
 
 	Category string `json:"category,omitempty" yaml:"category,omitempty"`
@@ -23,11 +25,15 @@ type TemplateVersion struct {
 
 	IsSystem string `json:"isSystem,omitempty" yaml:"is_system,omitempty"`
 
+	Labels map[string]interface{} `json:"labels,omitempty" yaml:"labels,omitempty"`
+
 	License string `json:"license,omitempty" yaml:"license,omitempty"`
 
 	Links map[string]interface{} `json:"links,omitempty" yaml:"links,omitempty"`
 
 	Maintainer string `json:"maintainer,omitempty" yaml:"maintainer,omitempty"`
+
+	MaximumRancherVersion string `json:"maximumRancherVersion,omitempty" yaml:"maximum_rancher_version,omitempty"`
 
 	MinimumRancherVersion string `json:"minimumRancherVersion,omitempty" yaml:"minimum_rancher_version,omitempty"`
 
@@ -37,7 +43,7 @@ type TemplateVersion struct {
 
 	ProjectURL string `json:"projectURL,omitempty" yaml:"project_url,omitempty"`
 
-	Questions []string `json:"questions,omitempty" yaml:"questions,omitempty"`
+	Questions []Question `json:"questions,omitempty" yaml:"questions,omitempty"`
 
 	ReadmeLink string `json:"readmeLink,omitempty" yaml:"readme_link,omitempty"`
 
@@ -45,7 +51,11 @@ type TemplateVersion struct {
 
 	TemplateVersionRancherVersion map[string]interface{} `json:"templateVersionRancherVersion,omitempty" yaml:"template_version_rancher_version,omitempty"`
 
+	TemplateVersionRancherVersionGte map[string]interface{} `json:"templateVersionRancherVersionGte,omitempty" yaml:"template_version_rancher_version_gte,omitempty"`
+
 	Type string `json:"type,omitempty" yaml:"type,omitempty"`
+
+	UpgradeFrom string `json:"upgradeFrom,omitempty" yaml:"upgrade_from,omitempty"`
 
 	UpgradeVersionLinks map[string]interface{} `json:"upgradeVersionLinks,omitempty" yaml:"upgrade_version_links,omitempty"`
 
@@ -56,7 +66,8 @@ type TemplateVersion struct {
 
 type TemplateVersionCollection struct {
 	Collection
-	Data []TemplateVersion `json:"data,omitempty"`
+	Data   []TemplateVersion `json:"data,omitempty"`
+	client *TemplateVersionClient
 }
 
 type TemplateVersionClient struct {
@@ -92,7 +103,18 @@ func (c *TemplateVersionClient) Update(existing *TemplateVersion, updates interf
 func (c *TemplateVersionClient) List(opts *ListOpts) (*TemplateVersionCollection, error) {
 	resp := &TemplateVersionCollection{}
 	err := c.rancherClient.doList(TEMPLATE_VERSION_TYPE, opts, resp)
+	resp.client = c
 	return resp, err
+}
+
+func (cc *TemplateVersionCollection) Next() (*TemplateVersionCollection, error) {
+	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
+		resp := &TemplateVersionCollection{}
+		err := cc.client.rancherClient.doNext(cc.Pagination.Next, resp)
+		resp.client = cc.client
+		return resp, err
+	}
+	return nil, nil
 }
 
 func (c *TemplateVersionClient) ById(id string) (*TemplateVersion, error) {

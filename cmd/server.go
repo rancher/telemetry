@@ -13,10 +13,12 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/goji/httpauth"
+	auth "github.com/abbot/go-http-auth"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/urfave/cli"
+	"github.com/urfave/negroni"
+	"golang.org/x/crypto/bcrypt"
 
 	publish "github.com/rancher/telemetry/publish"
 	record "github.com/rancher/telemetry/record"
@@ -30,6 +32,9 @@ var (
 	enableXff       bool
 	googlePublisher *publish.Google
 	dbPublisher     *publish.Postgres
+	adminUser       string
+	adminHash       string
+	authenticator   *auth.BasicAuth
 )
 
 type RequiredOptions []string
@@ -130,6 +135,19 @@ func ServerCommand() cli.Command {
 	}
 }
 
+func getHash(user string, realm string) string {
+	if user == adminUser && adminHash != "" {
+		return adminHash
+	}
+
+	hash, err := dbPublisher.GetAccountHash(user)
+	if err == nil {
+		return hash
+	}
+
+	return ""
+}
+
 func serverRun(c *cli.Context) error {
 	log.Infof("Telemetry Server %s", c.App.Version)
 	rand.Seed(time.Now().UnixNano())
@@ -138,42 +156,47 @@ func serverRun(c *cli.Context) error {
 	googlePublisher = publish.NewGoogle(c)
 	dbPublisher = publish.NewPostgres(c)
 
+	adminUser = c.String("admin-key")
+	adminSecret := c.String("admin-secret")
+	if adminUser != "" && adminSecret != "" {
+		bytes, _ := bcrypt.GenerateFromPassword([]byte(adminSecret), bcrypt.DefaultCost)
+		adminHash = string(bytes)
+	}
+
 	router := mux.NewRouter()
 	router.HandleFunc("/favicon.ico", http.NotFound)
 	router.HandleFunc("/healthcheck.html", serverCheck).Methods("GET")
 	router.HandleFunc("/publish", serverPublish).Methods("POST")
 	router.HandleFunc("/", serverRoot).Methods("GET")
 
-	user := c.String("admin-key")
-	pass := c.String("admin-secret")
-	if user == "" || pass == "" {
-		log.Warn("admin-{key,-secret} not set, admin disabled")
-	} else {
-		admin := mux.NewRouter()
+	// Admin
+	authenticator = auth.NewBasicAuthenticator("telemetry", getHash)
 
-		admin.HandleFunc("/admin/active", apiActive)                       // ?hours=7
-		admin.HandleFunc("/admin/active/fields/{fields}", apiActiveFields) // ?hours=7
-		admin.HandleFunc("/admin/active/map/{field}", apiActiveMap)        // ?hours=7
-		admin.HandleFunc("/admin/active/value/{field}", apiActiveValue)    // ?hours=7
+	admin := mux.NewRouter()
 
-		admin.HandleFunc("/admin/history", apiHistory)                       // ?days=28
-		admin.HandleFunc("/admin/history/fields/{fields}", apiHistoryFields) // ?days=28
-		admin.HandleFunc("/admin/history/map/{field}", apiHistoryMap)        // ?days=28
-		admin.HandleFunc("/admin/history/value/{field}", apiHistoryValue)    // ?days=28
-		admin.HandleFunc("/admin/history/installs", apiHistoryInstalls)
+	admin.HandleFunc("/admin/active", apiActive)                       // ?hours=7
+	admin.HandleFunc("/admin/active/fields/{fields}", apiActiveFields) // ?hours=7
+	admin.HandleFunc("/admin/active/map/{field}", apiActiveMap)        // ?hours=7
+	admin.HandleFunc("/admin/active/value/{field}", apiActiveValue)    // ?hours=7
 
-		admin.HandleFunc("/admin/installs/{uid}", apiInstallByUid)                  // ?days=28
-		admin.HandleFunc("/admin/installs/{uid}/fields/{fields}", apiInstallFields) // ?days=28
-		admin.HandleFunc("/admin/installs/{uid}/map/{field}", apiInstallMap)        // ?days=28
-		admin.HandleFunc("/admin/installs/{uid}/value/{field}", apiInstallValue)    // ?days=28
+	admin.HandleFunc("/admin/history", apiHistory)                       // ?days=28
+	admin.HandleFunc("/admin/history/fields/{fields}", apiHistoryFields) // ?days=28
+	admin.HandleFunc("/admin/history/map/{field}", apiHistoryMap)        // ?days=28
+	admin.HandleFunc("/admin/history/value/{field}", apiHistoryValue)    // ?days=28
+	admin.HandleFunc("/admin/history/installs", apiHistoryInstalls)
 
-		admin.HandleFunc("/admin/records/{id}", apiRecordById) // nothing
+	admin.HandleFunc("/admin/installs/{uid}", apiInstallByUid)                  // ?days=28
+	admin.HandleFunc("/admin/installs/{uid}/fields/{fields}", apiInstallFields) // ?days=28
+	admin.HandleFunc("/admin/installs/{uid}/map/{field}", apiInstallMap)        // ?days=28
+	admin.HandleFunc("/admin/installs/{uid}/value/{field}", apiInstallValue)    // ?days=28
 
-		authed := httpauth.SimpleBasicAuth(user, pass)(admin)
+	admin.HandleFunc("/admin/records/{id}", apiRecordById) // nothing
 
-		router.Handle("/admin", authed)
-		router.Handle("/admin/{_dummy:.*}", authed)
-	}
+	n := negroni.New()
+	n.Use(negroni.HandlerFunc(checkAuth))
+	n.UseHandler(admin)
+	router.PathPrefix("/admin").Handler(n)
+	// End: Admin
 
 	cors := handlers.CORS(
 		handlers.AllowedHeaders([]string{"authorization"}),
@@ -185,6 +208,15 @@ func serverRun(c *cli.Context) error {
 	log.Info("Listening on ", listen)
 	log.Fatal(http.ListenAndServe(listen, logged))
 	return nil
+}
+
+func checkAuth(w http.ResponseWriter, req *http.Request, next http.HandlerFunc) {
+	user := authenticator.CheckAuth(req)
+	if user == "" {
+		authenticator.RequireAuth(w, req)
+	} else {
+		next(w, req)
+	}
 }
 
 func serverCheck(w http.ResponseWriter, req *http.Request) {

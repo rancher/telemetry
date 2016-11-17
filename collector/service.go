@@ -40,7 +40,7 @@ func (out Service) Collect(c *CollectorOpts) interface{} {
 			out.Active++
 		}
 
-		byStack.Increment(service.EnvironmentId)
+		byStack.Increment(service.StackId)
 		out.Kind.Increment(service.Type)
 	}
 

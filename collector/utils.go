@@ -2,7 +2,7 @@ package collector
 
 import (
 	log "github.com/Sirupsen/logrus"
-	rancher "github.com/rancher/go-rancher/client"
+	rancher "github.com/rancher/go-rancher/v2"
 )
 
 func Min(x, y int) int {

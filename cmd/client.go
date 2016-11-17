@@ -12,7 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/urfave/cli"
 
-	rancher "github.com/rancher/go-rancher/client"
+	rancher "github.com/rancher/go-rancher/v2"
 	collector "github.com/rancher/telemetry/collector"
 	publish "github.com/rancher/telemetry/publish"
 	record "github.com/rancher/telemetry/record"
