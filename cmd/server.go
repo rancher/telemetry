@@ -331,8 +331,7 @@ func serverRoot(w http.ResponseWriter, req *http.Request) {
 func serverPublish(w http.ResponseWriter, req *http.Request) {
 	var r record.Record
 
-	decoder := json.NewDecoder(req.Body)
-	err := decoder.Decode(&r)
+	err := json.NewDecoder(req.Body).Decode(&r)
 	if err != nil {
 		respondError(w, req, "Error parsing Record", 400)
 		return

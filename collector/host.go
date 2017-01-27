@@ -85,7 +85,15 @@ func (h Host) Collect(c *CollectorOpts) interface{} {
 		mhz := Round(cpuInfo["mhz"].(float64))
 
 		for _, core := range cpuInfo["cpuCoresPercentages"].([]interface{}) {
-			utilFloat += core.(float64)
+			switch f := core.(type) {
+			case float64:
+				utilFloat += f
+			case string:
+				parsed, err := strconfv.ParseFloat(f)
+				if err == nil {
+					utilFloat += parsed
+				}
+			}
 		}
 		utilFloat = utilFloat / float64(cores)
 		util = Round(utilFloat)
