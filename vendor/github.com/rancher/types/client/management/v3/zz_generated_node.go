@@ -9,20 +9,33 @@ const (
 	NodeFieldAllocatable          = "allocatable"
 	NodeFieldAnnotations          = "annotations"
 	NodeFieldCapacity             = "capacity"
+	NodeFieldClusterId            = "clusterId"
+	NodeFieldConditions           = "conditions"
+	NodeFieldControlPlane         = "controlPlane"
 	NodeFieldCreated              = "created"
 	NodeFieldCreatorID            = "creatorId"
+	NodeFieldCustomConfig         = "customConfig"
 	NodeFieldDescription          = "description"
+	NodeFieldEtcd                 = "etcd"
 	NodeFieldHostname             = "hostname"
 	NodeFieldIPAddress            = "ipAddress"
+	NodeFieldImported             = "imported"
 	NodeFieldInfo                 = "info"
 	NodeFieldLabels               = "labels"
+	NodeFieldLimits               = "limits"
 	NodeFieldName                 = "name"
-	NodeFieldNodeConditions       = "nodeConditions"
+	NodeFieldNamespaceId          = "namespaceId"
+	NodeFieldNodeName             = "nodeName"
+	NodeFieldNodePoolId           = "nodePoolId"
+	NodeFieldNodeTaints           = "nodeTaints"
+	NodeFieldNodeTemplateId       = "nodeTemplateId"
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
 	NodeFieldProviderId           = "providerId"
-	NodeFieldPublicEndpoints      = "publicEndpoints"
 	NodeFieldRemoved              = "removed"
+	NodeFieldRequested            = "requested"
+	NodeFieldRequestedHostname    = "requestedHostname"
+	NodeFieldSshUser              = "sshUser"
 	NodeFieldState                = "state"
 	NodeFieldTaints               = "taints"
 	NodeFieldTransitioning        = "transitioning"
@@ -31,35 +44,50 @@ const (
 	NodeFieldUuid                 = "uuid"
 	NodeFieldVolumesAttached      = "volumesAttached"
 	NodeFieldVolumesInUse         = "volumesInUse"
+	NodeFieldWorker               = "worker"
 )
 
 type Node struct {
 	types.Resource
-	Allocatable          map[string]string         `json:"allocatable,omitempty"`
-	Annotations          map[string]string         `json:"annotations,omitempty"`
-	Capacity             map[string]string         `json:"capacity,omitempty"`
-	Created              string                    `json:"created,omitempty"`
-	CreatorID            string                    `json:"creatorId,omitempty"`
-	Description          string                    `json:"description,omitempty"`
-	Hostname             string                    `json:"hostname,omitempty"`
-	IPAddress            string                    `json:"ipAddress,omitempty"`
-	Info                 *NodeInfo                 `json:"info,omitempty"`
-	Labels               map[string]string         `json:"labels,omitempty"`
-	Name                 string                    `json:"name,omitempty"`
-	NodeConditions       []NodeCondition           `json:"nodeConditions,omitempty"`
-	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty"`
-	PodCidr              string                    `json:"podCidr,omitempty"`
-	ProviderId           string                    `json:"providerId,omitempty"`
-	PublicEndpoints      []PublicEndpoint          `json:"publicEndpoints,omitempty"`
-	Removed              string                    `json:"removed,omitempty"`
-	State                string                    `json:"state,omitempty"`
-	Taints               []Taint                   `json:"taints,omitempty"`
-	Transitioning        string                    `json:"transitioning,omitempty"`
-	TransitioningMessage string                    `json:"transitioningMessage,omitempty"`
-	Unschedulable        *bool                     `json:"unschedulable,omitempty"`
-	Uuid                 string                    `json:"uuid,omitempty"`
-	VolumesAttached      map[string]AttachedVolume `json:"volumesAttached,omitempty"`
-	VolumesInUse         []string                  `json:"volumesInUse,omitempty"`
+	Allocatable          map[string]string         `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
+	Annotations          map[string]string         `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Capacity             map[string]string         `json:"capacity,omitempty" yaml:"capacity,omitempty"`
+	ClusterId            string                    `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Conditions           []NodeCondition           `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	ControlPlane         bool                      `json:"controlPlane,omitempty" yaml:"controlPlane,omitempty"`
+	Created              string                    `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID            string                    `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	CustomConfig         *CustomConfig             `json:"customConfig,omitempty" yaml:"customConfig,omitempty"`
+	Description          string                    `json:"description,omitempty" yaml:"description,omitempty"`
+	Etcd                 bool                      `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	Hostname             string                    `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	IPAddress            string                    `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
+	Imported             bool                      `json:"imported,omitempty" yaml:"imported,omitempty"`
+	Info                 *NodeInfo                 `json:"info,omitempty" yaml:"info,omitempty"`
+	Labels               map[string]string         `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Limits               map[string]string         `json:"limits,omitempty" yaml:"limits,omitempty"`
+	Name                 string                    `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId          string                    `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	NodeName             string                    `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
+	NodePoolId           string                    `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
+	NodeTaints           []Taint                   `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
+	NodeTemplateId       string                    `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
+	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PodCidr              string                    `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
+	ProviderId           string                    `json:"providerId,omitempty" yaml:"providerId,omitempty"`
+	Removed              string                    `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Requested            map[string]string         `json:"requested,omitempty" yaml:"requested,omitempty"`
+	RequestedHostname    string                    `json:"requestedHostname,omitempty" yaml:"requestedHostname,omitempty"`
+	SshUser              string                    `json:"sshUser,omitempty" yaml:"sshUser,omitempty"`
+	State                string                    `json:"state,omitempty" yaml:"state,omitempty"`
+	Taints               []Taint                   `json:"taints,omitempty" yaml:"taints,omitempty"`
+	Transitioning        string                    `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage string                    `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	Unschedulable        bool                      `json:"unschedulable,omitempty" yaml:"unschedulable,omitempty"`
+	Uuid                 string                    `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	VolumesAttached      map[string]AttachedVolume `json:"volumesAttached,omitempty" yaml:"volumesAttached,omitempty"`
+	VolumesInUse         []string                  `json:"volumesInUse,omitempty" yaml:"volumesInUse,omitempty"`
+	Worker               bool                      `json:"worker,omitempty" yaml:"worker,omitempty"`
 }
 type NodeCollection struct {
 	types.Collection

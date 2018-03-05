@@ -53,17 +53,17 @@ func (m *MemoryInfo) UpdateAvg(i []float64) {
 	m.UtilAvg = Clamp(0, Round(Average(i)), 100)
 }
 
-func GetMachineTemplate(cli *rancher.Client, id string) *rancher.MachineTemplate {
+func GetNodeTemplate(cli *rancher.Client, id string) *rancher.NodeTemplate {
 	if id == "" {
-		log.Debugf("machineTemplate id is empty")
+		log.Debugf("nodeTemplate id is empty")
 		return nil
 	}
 
 	base := cli.Opts.URL
-	url := base + "/machineTemplates/" + id
+	url := base + "/nodeTemplates/" + id
 
-	mTemplate := &rancher.MachineTemplate{}
-	version := "machineTemplate"
+	mTemplate := &rancher.NodeTemplate{}
+	version := "nodeTemplate"
 
 	resource := norman.Resource{}
 	resource.Links = make(map[string]string)
@@ -71,12 +71,12 @@ func GetMachineTemplate(cli *rancher.Client, id string) *rancher.MachineTemplate
 
 	err := cli.GetLink(resource, version, mTemplate)
 
-	if mTemplate == nil || mTemplate.Type != "machineTemplate" {
-		log.Debugf("machineTemplate not found [%s]", resource.Links[version])
+	if mTemplate == nil || mTemplate.Type != "nodeTemplate" {
+		log.Debugf("nodeTemplate not found [%s]", resource.Links[version])
 		return nil
 	}
 	if err != nil {
-		log.Debugf("Error getting machineTemplate [%s] %s", resource.Links[version], err)
+		log.Debugf("Error getting nodeTemplate [%s] %s", resource.Links[version], err)
 		return nil
 	}
 
@@ -113,6 +113,10 @@ func GetMem(item, unit string) int64 {
 }
 
 func GetRawInt64(item, sep string) int64 {
+	if item == "" {
+		return int64(0)
+	}
+
 	toConv := item
 	if sep != "" {
 		toConv = strings.Replace(item, sep, "", 1)
@@ -121,6 +125,7 @@ func GetRawInt64(item, sep string) int64 {
 	result, err := strconv.ParseInt(toConv, 10, 64)
 	if err != nil {
 		log.Debugf("Error converting string to int64 [%s] %s", toConv, err)
+		return int64(0)
 	}
 
 	return result

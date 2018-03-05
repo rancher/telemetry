@@ -11,7 +11,7 @@ type NsInfo struct {
 	NsMax       int `json:"max"`
 	NsTotal     int `json:"total"`
 	NsAvg       int `json:"avg"`
-	FromCatalog int `json:"from_catalog"`
+	FromCatalog int `json:"from_catalog,omitempty"`
 	NoProject   int `json:"no_project,omitempty"`
 }
 
@@ -27,9 +27,10 @@ func (n *NsInfo) UpdateAvg(i []float64) {
 
 func (n *NsInfo) UpdateDetails(nsc *rancher.NamespaceCollection) {
 	for _, ns := range nsc.Data {
-		if FromCatalog(ns.ExternalID) {
-			n.FromCatalog++
-		}
+		// ExternalID field is not on namespace definition yet
+		//if FromCatalog(ns.ExternalID) {
+		//	n.FromCatalog++
+		//}
 		if ns.ProjectID == "" {
 			n.NoProject++
 		}

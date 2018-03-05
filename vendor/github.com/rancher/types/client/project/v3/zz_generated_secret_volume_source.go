@@ -5,12 +5,12 @@ const (
 	SecretVolumeSourceFieldDefaultMode = "defaultMode"
 	SecretVolumeSourceFieldItems       = "items"
 	SecretVolumeSourceFieldOptional    = "optional"
-	SecretVolumeSourceFieldSecretName  = "secretName"
+	SecretVolumeSourceFieldSecretId    = "secretId"
 )
 
 type SecretVolumeSource struct {
-	DefaultMode *int64      `json:"defaultMode,omitempty"`
-	Items       []KeyToPath `json:"items,omitempty"`
-	Optional    *bool       `json:"optional,omitempty"`
-	SecretName  string      `json:"secretName,omitempty"`
+	DefaultMode *int64      `json:"defaultMode,omitempty" yaml:"defaultMode,omitempty"`
+	Items       []KeyToPath `json:"items,omitempty" yaml:"items,omitempty"`
+	Optional    *bool       `json:"optional,omitempty" yaml:"optional,omitempty"`
+	SecretId    string      `json:"secretId,omitempty" yaml:"secretId,omitempty"`
 }

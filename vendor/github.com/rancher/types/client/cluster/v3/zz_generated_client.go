@@ -8,8 +8,8 @@ type Client struct {
 	clientbase.APIBaseClient
 
 	Namespace        NamespaceOperations
-	Node             NodeOperations
 	PersistentVolume PersistentVolumeOperations
+	StorageClass     StorageClassOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -23,8 +23,8 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	}
 
 	client.Namespace = newNamespaceClient(client)
-	client.Node = newNodeClient(client)
 	client.PersistentVolume = newPersistentVolumeClient(client)
+	client.StorageClass = newStorageClassClient(client)
 
 	return client, nil
 }

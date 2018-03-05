@@ -1,18 +1,18 @@
 package client
 
 const (
-	PersistentVolumeClaimSpecType                  = "persistentVolumeClaimSpec"
-	PersistentVolumeClaimSpecFieldAccessModes      = "accessModes"
-	PersistentVolumeClaimSpecFieldResources        = "resources"
-	PersistentVolumeClaimSpecFieldSelector         = "selector"
-	PersistentVolumeClaimSpecFieldStorageClassName = "storageClassName"
-	PersistentVolumeClaimSpecFieldVolumeName       = "volumeName"
+	PersistentVolumeClaimSpecType                = "persistentVolumeClaimSpec"
+	PersistentVolumeClaimSpecFieldAccessModes    = "accessModes"
+	PersistentVolumeClaimSpecFieldResources      = "resources"
+	PersistentVolumeClaimSpecFieldSelector       = "selector"
+	PersistentVolumeClaimSpecFieldStorageClassId = "storageClassId"
+	PersistentVolumeClaimSpecFieldVolumeId       = "volumeId"
 )
 
 type PersistentVolumeClaimSpec struct {
-	AccessModes      []string              `json:"accessModes,omitempty"`
-	Resources        *ResourceRequirements `json:"resources,omitempty"`
-	Selector         *LabelSelector        `json:"selector,omitempty"`
-	StorageClassName string                `json:"storageClassName,omitempty"`
-	VolumeName       string                `json:"volumeName,omitempty"`
+	AccessModes    []string              `json:"accessModes,omitempty" yaml:"accessModes,omitempty"`
+	Resources      *ResourceRequirements `json:"resources,omitempty" yaml:"resources,omitempty"`
+	Selector       *LabelSelector        `json:"selector,omitempty" yaml:"selector,omitempty"`
+	StorageClassId string                `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
+	VolumeId       string                `json:"volumeId,omitempty" yaml:"volumeId,omitempty"`
 }

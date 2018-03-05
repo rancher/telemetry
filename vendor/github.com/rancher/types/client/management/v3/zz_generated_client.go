@@ -7,10 +7,10 @@ import (
 type Client struct {
 	clientbase.APIBaseClient
 
+	NodePool                   NodePoolOperations
 	Node                       NodeOperations
-	Machine                    MachineOperations
-	MachineDriver              MachineDriverOperations
-	MachineTemplate            MachineTemplateOperations
+	NodeDriver                 NodeDriverOperations
+	NodeTemplate               NodeTemplateOperations
 	Project                    ProjectOperations
 	GlobalRole                 GlobalRoleOperations
 	GlobalRoleBinding          GlobalRoleBindingOperations
@@ -31,12 +31,21 @@ type Client struct {
 	AuthConfig                 AuthConfigOperations
 	Token                      TokenOperations
 	DynamicSchema              DynamicSchemaOperations
-	App                        AppOperations
 	Preference                 PreferenceOperations
+	ProjectNetworkPolicy       ProjectNetworkPolicyOperations
 	ClusterLogging             ClusterLoggingOperations
 	ProjectLogging             ProjectLoggingOperations
 	ListenConfig               ListenConfigOperations
 	Setting                    SettingOperations
+	Notifier                   NotifierOperations
+	ClusterAlert               ClusterAlertOperations
+	ProjectAlert               ProjectAlertOperations
+	SourceCodeCredential       SourceCodeCredentialOperations
+	ClusterPipeline            ClusterPipelineOperations
+	Pipeline                   PipelineOperations
+	PipelineExecution          PipelineExecutionOperations
+	SourceCodeRepository       SourceCodeRepositoryOperations
+	PipelineExecutionLog       PipelineExecutionLogOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -49,10 +58,10 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 		APIBaseClient: baseClient,
 	}
 
+	client.NodePool = newNodePoolClient(client)
 	client.Node = newNodeClient(client)
-	client.Machine = newMachineClient(client)
-	client.MachineDriver = newMachineDriverClient(client)
-	client.MachineTemplate = newMachineTemplateClient(client)
+	client.NodeDriver = newNodeDriverClient(client)
+	client.NodeTemplate = newNodeTemplateClient(client)
 	client.Project = newProjectClient(client)
 	client.GlobalRole = newGlobalRoleClient(client)
 	client.GlobalRoleBinding = newGlobalRoleBindingClient(client)
@@ -73,12 +82,21 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.AuthConfig = newAuthConfigClient(client)
 	client.Token = newTokenClient(client)
 	client.DynamicSchema = newDynamicSchemaClient(client)
-	client.App = newAppClient(client)
 	client.Preference = newPreferenceClient(client)
+	client.ProjectNetworkPolicy = newProjectNetworkPolicyClient(client)
 	client.ClusterLogging = newClusterLoggingClient(client)
 	client.ProjectLogging = newProjectLoggingClient(client)
 	client.ListenConfig = newListenConfigClient(client)
 	client.Setting = newSettingClient(client)
+	client.Notifier = newNotifierClient(client)
+	client.ClusterAlert = newClusterAlertClient(client)
+	client.ProjectAlert = newProjectAlertClient(client)
+	client.SourceCodeCredential = newSourceCodeCredentialClient(client)
+	client.ClusterPipeline = newClusterPipelineClient(client)
+	client.Pipeline = newPipelineClient(client)
+	client.PipelineExecution = newPipelineExecutionClient(client)
+	client.SourceCodeRepository = newSourceCodeRepositoryClient(client)
+	client.PipelineExecutionLog = newPipelineExecutionLogClient(client)
 
 	return client, nil
 }
