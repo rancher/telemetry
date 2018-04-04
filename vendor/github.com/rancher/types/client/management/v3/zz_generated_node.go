@@ -17,6 +17,7 @@ const (
 	NodeFieldCustomConfig         = "customConfig"
 	NodeFieldDescription          = "description"
 	NodeFieldEtcd                 = "etcd"
+	NodeFieldExternalIPAddress    = "externalIpAddress"
 	NodeFieldHostname             = "hostname"
 	NodeFieldIPAddress            = "ipAddress"
 	NodeFieldImported             = "imported"
@@ -32,6 +33,7 @@ const (
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
 	NodeFieldProviderId           = "providerId"
+	NodeFieldPublicEndpoints      = "publicEndpoints"
 	NodeFieldRemoved              = "removed"
 	NodeFieldRequested            = "requested"
 	NodeFieldRequestedHostname    = "requestedHostname"
@@ -60,6 +62,7 @@ type Node struct {
 	CustomConfig         *CustomConfig             `json:"customConfig,omitempty" yaml:"customConfig,omitempty"`
 	Description          string                    `json:"description,omitempty" yaml:"description,omitempty"`
 	Etcd                 bool                      `json:"etcd,omitempty" yaml:"etcd,omitempty"`
+	ExternalIPAddress    string                    `json:"externalIpAddress,omitempty" yaml:"externalIpAddress,omitempty"`
 	Hostname             string                    `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	IPAddress            string                    `json:"ipAddress,omitempty" yaml:"ipAddress,omitempty"`
 	Imported             bool                      `json:"imported,omitempty" yaml:"imported,omitempty"`
@@ -75,6 +78,7 @@ type Node struct {
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
 	ProviderId           string                    `json:"providerId,omitempty" yaml:"providerId,omitempty"`
+	PublicEndpoints      []PublicEndpoint          `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	Removed              string                    `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Requested            map[string]string         `json:"requested,omitempty" yaml:"requested,omitempty"`
 	RequestedHostname    string                    `json:"requestedHostname,omitempty" yaml:"requestedHostname,omitempty"`

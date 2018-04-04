@@ -17,6 +17,7 @@ const (
 	PersistentVolumeFieldClaimRef                      = "claimRef"
 	PersistentVolumeFieldCreated                       = "created"
 	PersistentVolumeFieldCreatorID                     = "creatorId"
+	PersistentVolumeFieldDescription                   = "description"
 	PersistentVolumeFieldFC                            = "fc"
 	PersistentVolumeFieldFlexVolume                    = "flexVolume"
 	PersistentVolumeFieldFlocker                       = "flocker"
@@ -39,7 +40,7 @@ const (
 	PersistentVolumeFieldScaleIO                       = "scaleIO"
 	PersistentVolumeFieldState                         = "state"
 	PersistentVolumeFieldStatus                        = "status"
-	PersistentVolumeFieldStorageClassName              = "storageClassName"
+	PersistentVolumeFieldStorageClassId                = "storageClassId"
 	PersistentVolumeFieldStorageOS                     = "storageos"
 	PersistentVolumeFieldTransitioning                 = "transitioning"
 	PersistentVolumeFieldTransitioningMessage          = "transitioningMessage"
@@ -60,6 +61,7 @@ type PersistentVolume struct {
 	ClaimRef                      *ObjectReference                  `json:"claimRef,omitempty" yaml:"claimRef,omitempty"`
 	Created                       string                            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                     string                            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Description                   string                            `json:"description,omitempty" yaml:"description,omitempty"`
 	FC                            *FCVolumeSource                   `json:"fc,omitempty" yaml:"fc,omitempty"`
 	FlexVolume                    *FlexVolumeSource                 `json:"flexVolume,omitempty" yaml:"flexVolume,omitempty"`
 	Flocker                       *FlockerVolumeSource              `json:"flocker,omitempty" yaml:"flocker,omitempty"`
@@ -82,7 +84,7 @@ type PersistentVolume struct {
 	ScaleIO                       *ScaleIOVolumeSource              `json:"scaleIO,omitempty" yaml:"scaleIO,omitempty"`
 	State                         string                            `json:"state,omitempty" yaml:"state,omitempty"`
 	Status                        *PersistentVolumeStatus           `json:"status,omitempty" yaml:"status,omitempty"`
-	StorageClassName              string                            `json:"storageClassName,omitempty" yaml:"storageClassName,omitempty"`
+	StorageClassId                string                            `json:"storageClassId,omitempty" yaml:"storageClassId,omitempty"`
 	StorageOS                     *StorageOSPersistentVolumeSource  `json:"storageos,omitempty" yaml:"storageos,omitempty"`
 	Transitioning                 string                            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage          string                            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`

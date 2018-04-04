@@ -7,45 +7,48 @@ import (
 type Client struct {
 	clientbase.APIBaseClient
 
-	NodePool                   NodePoolOperations
-	Node                       NodeOperations
-	NodeDriver                 NodeDriverOperations
-	NodeTemplate               NodeTemplateOperations
-	Project                    ProjectOperations
-	GlobalRole                 GlobalRoleOperations
-	GlobalRoleBinding          GlobalRoleBindingOperations
-	RoleTemplate               RoleTemplateOperations
-	PodSecurityPolicyTemplate  PodSecurityPolicyTemplateOperations
-	ClusterRoleTemplateBinding ClusterRoleTemplateBindingOperations
-	ProjectRoleTemplateBinding ProjectRoleTemplateBindingOperations
-	Cluster                    ClusterOperations
-	ClusterEvent               ClusterEventOperations
-	ClusterRegistrationToken   ClusterRegistrationTokenOperations
-	Catalog                    CatalogOperations
-	Template                   TemplateOperations
-	TemplateVersion            TemplateVersionOperations
-	Group                      GroupOperations
-	GroupMember                GroupMemberOperations
-	Principal                  PrincipalOperations
-	User                       UserOperations
-	AuthConfig                 AuthConfigOperations
-	Token                      TokenOperations
-	DynamicSchema              DynamicSchemaOperations
-	Preference                 PreferenceOperations
-	ProjectNetworkPolicy       ProjectNetworkPolicyOperations
-	ClusterLogging             ClusterLoggingOperations
-	ProjectLogging             ProjectLoggingOperations
-	ListenConfig               ListenConfigOperations
-	Setting                    SettingOperations
-	Notifier                   NotifierOperations
-	ClusterAlert               ClusterAlertOperations
-	ProjectAlert               ProjectAlertOperations
-	SourceCodeCredential       SourceCodeCredentialOperations
-	ClusterPipeline            ClusterPipelineOperations
-	Pipeline                   PipelineOperations
-	PipelineExecution          PipelineExecutionOperations
-	SourceCodeRepository       SourceCodeRepositoryOperations
-	PipelineExecutionLog       PipelineExecutionLogOperations
+	NodePool                                NodePoolOperations
+	Node                                    NodeOperations
+	NodeDriver                              NodeDriverOperations
+	NodeTemplate                            NodeTemplateOperations
+	Project                                 ProjectOperations
+	GlobalRole                              GlobalRoleOperations
+	GlobalRoleBinding                       GlobalRoleBindingOperations
+	RoleTemplate                            RoleTemplateOperations
+	PodSecurityPolicyTemplate               PodSecurityPolicyTemplateOperations
+	PodSecurityPolicyTemplateProjectBinding PodSecurityPolicyTemplateProjectBindingOperations
+	ClusterRoleTemplateBinding              ClusterRoleTemplateBindingOperations
+	ProjectRoleTemplateBinding              ProjectRoleTemplateBindingOperations
+	Cluster                                 ClusterOperations
+	ClusterEvent                            ClusterEventOperations
+	ClusterRegistrationToken                ClusterRegistrationTokenOperations
+	Catalog                                 CatalogOperations
+	Template                                TemplateOperations
+	TemplateVersion                         TemplateVersionOperations
+	Group                                   GroupOperations
+	GroupMember                             GroupMemberOperations
+	Principal                               PrincipalOperations
+	User                                    UserOperations
+	AuthConfig                              AuthConfigOperations
+	Token                                   TokenOperations
+	DynamicSchema                           DynamicSchemaOperations
+	Preference                              PreferenceOperations
+	ProjectNetworkPolicy                    ProjectNetworkPolicyOperations
+	ClusterLogging                          ClusterLoggingOperations
+	ProjectLogging                          ProjectLoggingOperations
+	ListenConfig                            ListenConfigOperations
+	Setting                                 SettingOperations
+	Notifier                                NotifierOperations
+	ClusterAlert                            ClusterAlertOperations
+	ProjectAlert                            ProjectAlertOperations
+	ClusterPipeline                         ClusterPipelineOperations
+	SourceCodeCredential                    SourceCodeCredentialOperations
+	Pipeline                                PipelineOperations
+	PipelineExecution                       PipelineExecutionOperations
+	PipelineExecutionLog                    PipelineExecutionLogOperations
+	SourceCodeRepository                    SourceCodeRepositoryOperations
+	GlobalComposeConfig                     GlobalComposeConfigOperations
+	ClusterComposeConfig                    ClusterComposeConfigOperations
 }
 
 func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
@@ -67,6 +70,7 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.GlobalRoleBinding = newGlobalRoleBindingClient(client)
 	client.RoleTemplate = newRoleTemplateClient(client)
 	client.PodSecurityPolicyTemplate = newPodSecurityPolicyTemplateClient(client)
+	client.PodSecurityPolicyTemplateProjectBinding = newPodSecurityPolicyTemplateProjectBindingClient(client)
 	client.ClusterRoleTemplateBinding = newClusterRoleTemplateBindingClient(client)
 	client.ProjectRoleTemplateBinding = newProjectRoleTemplateBindingClient(client)
 	client.Cluster = newClusterClient(client)
@@ -91,12 +95,14 @@ func NewClient(opts *clientbase.ClientOpts) (*Client, error) {
 	client.Notifier = newNotifierClient(client)
 	client.ClusterAlert = newClusterAlertClient(client)
 	client.ProjectAlert = newProjectAlertClient(client)
-	client.SourceCodeCredential = newSourceCodeCredentialClient(client)
 	client.ClusterPipeline = newClusterPipelineClient(client)
+	client.SourceCodeCredential = newSourceCodeCredentialClient(client)
 	client.Pipeline = newPipelineClient(client)
 	client.PipelineExecution = newPipelineExecutionClient(client)
-	client.SourceCodeRepository = newSourceCodeRepositoryClient(client)
 	client.PipelineExecutionLog = newPipelineExecutionLogClient(client)
+	client.SourceCodeRepository = newSourceCodeRepositoryClient(client)
+	client.GlobalComposeConfig = newGlobalComposeConfigClient(client)
+	client.ClusterComposeConfig = newClusterComposeConfigClient(client)
 
 	return client, nil
 }

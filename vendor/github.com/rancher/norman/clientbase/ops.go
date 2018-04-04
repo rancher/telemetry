@@ -96,12 +96,7 @@ func (a *APIOperations) DoList(schemaType string, opts *types.ListOpts, respObje
 		return errors.New("Resource type [" + schemaType + "] is not listable")
 	}
 
-	collectionURL, ok := schema.Links[COLLECTION]
-	if !ok {
-		return errors.New("Failed to find collection URL for [" + schemaType + "]")
-	}
-
-	return a.DoGet(collectionURL, opts, respObject)
+	return a.DoGet(a.Opts.URL+"/"+schemaType, opts, respObject)
 }
 
 func (a *APIOperations) DoNext(nextURL string, respObject interface{}) error {
@@ -252,7 +247,32 @@ func (a *APIOperations) DoAction(schemaType string, action string,
 		return fmt.Errorf("action [%v] not available on [%v]", action, existing)
 	}
 
-	_, ok = a.Types[schemaType]
+	return a.doAction(schemaType, action, actionURL, inputObject, respObject)
+}
+
+func (a *APIOperations) DoCollectionAction(schemaType string, action string,
+	existing *types.Collection, inputObject, respObject interface{}) error {
+
+	if existing == nil {
+		return errors.New("Existing object is nil")
+	}
+
+	actionURL, ok := existing.Actions[action]
+	if !ok {
+		return fmt.Errorf("action [%v] not available on [%v]", action, existing)
+	}
+
+	return a.doAction(schemaType, action, actionURL, inputObject, respObject)
+}
+
+func (a *APIOperations) doAction(
+	schemaType string,
+	action string,
+	actionURL string,
+	inputObject interface{},
+	respObject interface{},
+) error {
+	_, ok := a.Types[schemaType]
 	if !ok {
 		return errors.New("Unknown schema type [" + schemaType + "]")
 	}
