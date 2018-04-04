@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
 	cmd "github.com/rancher/telemetry/cmd"

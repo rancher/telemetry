@@ -1,12 +1,12 @@
 package collector
 
 import (
-	rancher "github.com/rancher/go-rancher/v2"
 	"github.com/rancher/telemetry/record"
+	rancher "github.com/rancher/types/client/management/v3"
 )
 
 type CollectorOpts struct {
-	Client *rancher.RancherClient
+	Client *rancher.Client
 }
 
 type Collector interface {

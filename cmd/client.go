@@ -8,14 +8,15 @@ import (
 	"strconv"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	rancher "github.com/rancher/go-rancher/v2"
+	"github.com/rancher/norman/clientbase"
 	collector "github.com/rancher/telemetry/collector"
 	publish "github.com/rancher/telemetry/publish"
 	record "github.com/rancher/telemetry/record"
+	rancher "github.com/rancher/types/client/management/v3"
 )
 
 var (
@@ -23,10 +24,12 @@ var (
 	url       string
 	accessKey string
 	secretKey string
+	tokenKey  string
+	caCert    string
 	target    string
 )
 
-const RECORD_VERSION = 1
+const RECORD_VERSION = 2
 const EXISTING_FILE = ".existing"
 
 func ClientCommand() cli.Command {
@@ -72,6 +75,21 @@ func ClientCommand() cli.Command {
 			},
 
 			cli.StringFlag{
+				Name:        "token-key",
+				Usage:       "token key for api",
+				Value:       "",
+				EnvVar:      "CATTLE_TOKEN_KEY",
+				Destination: &tokenKey,
+			},
+
+			cli.StringFlag{
+				Name:   "crt-file",
+				Usage:  "Ca trust certificate file for api",
+				Value:  "",
+				EnvVar: "CATTLE_CERTIFICATE",
+			},
+
+			cli.StringFlag{
 				Name:   "interval",
 				Usage:  "reporting interval",
 				Value:  "6h",
@@ -89,19 +107,28 @@ func ClientCommand() cli.Command {
 }
 
 func clientRun(c *cli.Context) error {
-	if c.Bool("once") {
-		return clientShowOnce()
-	}
-
 	log.Infof("Telemetry Client %s", c.App.Version)
 
-	if url == "" || accessKey == "" || secretKey == "" {
-		return cli.NewExitError("URL, Access Key, and Secret Key are required", 1)
+	if url == "" || (tokenKey == "" && (accessKey == "" || secretKey == "")) {
+		return cli.NewExitError("URL, Access Key and Secret Key OR Token Key are required", 1)
 	}
 
 	clientVersion := c.String("version")
 	if clientVersion == "" {
 		clientVersion = "unknown"
+	}
+
+	crt_file := c.String("crt-file")
+	if crt_file != "" {
+		crt, err := ioutil.ReadFile(crt_file)
+		if err != nil {
+			return cli.NewExitError("Error reading certificate file", 1)
+		}
+		caCert = string(crt)
+	}
+
+	if c.Bool("once") {
+		return clientShowOnce()
 	}
 
 	publisher = publish.NewToUrl(c)
@@ -202,10 +229,12 @@ func report() {
 }
 
 func collect() (record.Record, error) {
-	client, err := rancher.NewRancherClient(&rancher.ClientOpts{
-		Url:       url,
+	client, err := rancher.NewClient(&clientbase.ClientOpts{
+		URL:       url,
 		AccessKey: accessKey,
 		SecretKey: secretKey,
+		TokenKey:  tokenKey,
+		CACerts:   caCert,
 	})
 
 	if err != nil {
