@@ -230,11 +230,9 @@ func report() {
 
 func collect() (record.Record, error) {
 	client, err := rancher.NewClient(&clientbase.ClientOpts{
-		URL:       url,
-		AccessKey: accessKey,
-		SecretKey: secretKey,
-		TokenKey:  tokenKey,
-		CACerts:   caCert,
+		URL:      url,
+		TokenKey: tokenKey,
+		Insecure: true,
 	})
 
 	if err != nil {
