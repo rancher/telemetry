@@ -1,10 +1,15 @@
 package collector
 
 import (
+	"strings"
+
+	rancher "github.com/rancher/types/client/cluster/v3"
 	log "github.com/sirupsen/logrus"
 )
 
 const orchestrationName = "cattle-V2.0"
+
+const projectLabel = "field.cattle.io/projectId"
 
 type Project struct {
 	Total         int          `json:"total"`
@@ -43,14 +48,21 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 
 	for _, project := range list.Data {
 		// Namespace
-		nsCollection := GetNamespaceCollection(c, project.Links["namespaces"])
-		if nsCollection != nil {
+		parts := strings.SplitN(project.ID, ":", 2)
+		if len(parts) == 2 {
+			clusterID := parts[0]
+			projectID := parts[1]
+			cluster, err := c.Client.Cluster.ByID(clusterID)
+			if err != nil {
+				log.Errorf("Failed to get cluster %s err=%s", clusterID, err)
+				return nil
+			}
+			nsCollection := filterNSCollectionWithProjectID(GetNamespaceCollection(c, cluster.Links["namespaces"]), projectID)
 			totalNs := len(nsCollection.Data)
 			p.Ns.Update(totalNs)
 			nsUtils = append(nsUtils, float64(totalNs))
-			p.Ns.UpdateDetails(nsCollection)
+			p.Ns.UpdateDetails(&nsCollection)
 		}
-
 		// Workload
 		wlCollection := GetWorkloadCollection(c, project.Links["workloads"])
 		if wlCollection != nil {
@@ -73,6 +85,21 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 	p.Pod.UpdateAvg(poUtils)
 
 	return p
+}
+
+func filterNSCollectionWithProjectID(collection *rancher.NamespaceCollection, projectID string) rancher.NamespaceCollection {
+	result := rancher.NamespaceCollection{
+		Data: []rancher.Namespace{},
+	}
+	if collection == nil {
+		return result
+	}
+	for _, ns := range collection.Data {
+		if ns.Labels[projectLabel] == projectID {
+			result.Data = append(result.Data, ns)
+		}
+	}
+	return result
 }
 
 func init() {
