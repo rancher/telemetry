@@ -55,7 +55,10 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 		}
 
 		allocatable := cluster.Allocatable
-		if allocatable["cpu"] == "0" || allocatable["memory"] == "0" || allocatable["pods"] == "0" {
+		totalCores := GetRawInt(allocatable["cpu"], "")
+		totalMemMb := GetMemMb(allocatable["memory"])
+		totalPods := GetRawInt(allocatable["pods"], "")
+		if totalCores == 0 || totalMemMb == 0 || totalPods == 0 {
 			log.Debugf("  Skipping Cluster with no resources: %s", displayClusterName(cluster))
 			continue
 		}
@@ -63,7 +66,6 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 		requested := cluster.Requested
 
 		// CPU
-		totalCores := GetRawInt(allocatable["cpu"], "")
 		usedCores := GetRawInt(requested["cpu"], "m")
 		utilFloat = float64(usedCores) / float64(totalCores*10)
 		util = Round(utilFloat)
@@ -73,7 +75,6 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 		log.Debugf("    CPU cores=%d, util=%d", totalCores, util)
 
 		// Memory
-		totalMemMb := GetMemMb(allocatable["memory"])
 		usedMemMB := GetMemMb(requested["memory"])
 		utilFloat = 100 * float64(usedMemMB) / float64(totalMemMb)
 		util = Round(utilFloat)
@@ -83,7 +84,6 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 		log.Debugf("    Mem used=%d, total=%d, util=%d", usedMemMB, totalMemMb, util)
 
 		// Pod
-		totalPods := GetRawInt(allocatable["pods"], "")
 		usedPods := GetRawInt(requested["pods"], "")
 		utilFloat = 100 * float64(usedPods) / float64(totalPods)
 		util = Round(utilFloat)

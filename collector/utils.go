@@ -123,7 +123,8 @@ func GetRawInt64(item, sep string) int64 {
 	}
 
 	result, err := strconv.ParseInt(toConv, 10, 64)
-	if err != nil {
+	// If error or result is negative returning 0
+	if err != nil || result < 0 {
 		log.Debugf("Error converting string to int64 [%s] %s", toConv, err)
 		return int64(0)
 	}
@@ -138,9 +139,12 @@ func GetRawInt(item, sep string) int {
 	}
 
 	result, err := strconv.Atoi(toConv)
-	if err != nil {
+	// If error or result is negative returning 0
+	if err != nil || result < 0 {
 		log.Debugf("Error converting string to int [%s] %s", toConv, err)
+		return 0
 	}
+
 	return result
 }
 
