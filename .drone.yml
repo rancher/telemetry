@@ -1,20 +1,41 @@
 ---
-pipeline:
-  build:
-    privileged: true
-    image: rancher/dapper:1.11.2
-    volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-    commands:
-    - dapper ci
+kind: pipeline
+name: default
 
-  github_binary_release:
-    image: plugins/github-release
-    files:
-     - bin/*
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+- name: build
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+  - dapper ci
+  volumes:
+  - name: docker
+    path: /var/run/docker.sock
+
+- name: github_binary_release
+  pull: default
+  image: plugins/github-release
+  settings:
     checksum:
-     - sha256
-    secrets: [github_token]
-    when:
-      branch: master
-      event: tag
+    - sha256
+    files:
+    - "bin/*"
+    api_key:
+      from_secret: github_token
+  when:
+    instance:
+    - drone-publish.rancher.io
+    event:
+    - tag
+    refs:
+    - refs/head/master
+    - refs/tags/*
+
+volumes:
+- name: docker
+  host:
+    path: /var/run/docker.sock
