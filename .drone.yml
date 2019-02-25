@@ -1,27 +1,24 @@
----
 kind: pipeline
-name: default
+name: amd64
 
 platform:
   os: linux
   arch: amd64
 
 steps:
-- name: build
+- name: build-amd64
   pull: default
   image: rancher/dapper:v0.4.1
   commands:
-  - dapper ci
+    - dapper ci
   volumes:
-  - name: docker
-    path: /var/run/docker.sock
+    - name: docker
+      path: /var/run/docker.sock
 
-- name: github_binary_release
+- name: github_binary_release_amd64
   pull: default
   image: plugins/github-release
   settings:
-    checksum:
-    - sha256
     files:
     - "bin/*"
     api_key:
@@ -34,8 +31,45 @@ steps:
     refs:
     - refs/head/master
     - refs/tags/*
-
 volumes:
-- name: docker
-  host:
-    path: /var/run/docker.sock
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+---
+kind: pipeline
+name: arm64
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+- name: build-arm64
+  pull: default
+  image: rancher/dapper:v0.4.1
+  commands:
+    - dapper ci
+  volumes:
+    - name: docker
+      path: /var/run/docker.sock
+
+- name: github_binary_release_arm64
+  pull: default
+  image: plugins/github-release
+  settings:
+    files:
+    - "bin/*"
+    api_key:
+      from_secret: github_token
+  when:
+    instance:
+    - drone-publish.rancher.io
+    event:
+    - tag
+    refs:
+    - refs/head/master
+    - refs/tags/*
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
