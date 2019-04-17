@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	UID_SETTING            = "telemetry-uid"
+	UID_SETTING            = "install-uuid"
 	SERVER_IMAGE_SETTING   = "server-image"
 	SERVER_VERSION_SETTING = "server-version"
 )
