@@ -1,0 +1,4 @@
+--ignore-dir=.git
+--ignore-dir=dist
+--ignore-dir=tmp
+--ignore-dir=vendor

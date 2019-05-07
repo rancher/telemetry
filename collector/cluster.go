@@ -121,6 +121,6 @@ func displayClusterName(c rancher.Cluster) string {
 	if len(c.Name) > 0 {
 		return c.Name
 	} else {
-		return "(" + c.Uuid + ")"
+		return "(" + c.UUID + ")"
 	}
 }

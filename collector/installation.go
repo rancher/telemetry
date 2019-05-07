@@ -3,6 +3,7 @@ package collector
 import (
 	"github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
+	"regexp"
 )
 
 const (
@@ -12,10 +13,15 @@ const (
 )
 
 type Installation struct {
-	Uid     string `json:"uid"`
-	Image   string `json:"image"`
-	Version string `json:"version"`
-	//AuthConfig LabelCount `json:"auth"`
+	Uid                  string     `json:"uid"`
+	Image                string     `json:"image"`
+	Version              string     `json:"version"`
+	AuthConfig           LabelCount `json:"auth"`
+	KontainerDriverCount int        `json:"kontainerDriverCount"`
+	KontainerDrivers     LabelCount `json:"kontainerDrivers"`
+	NodeDriverCount      int        `json:"nodeDriverCount"`
+	NodeDrivers          LabelCount `json:"nodeDrivers"`
+	HasInternal          bool       `json:"hasInternal"`
 }
 
 func (i Installation) RecordKey() string {
@@ -25,6 +31,8 @@ func (i Installation) RecordKey() string {
 func (i Installation) Collect(c *CollectorOpts) interface{} {
 	log.Debug("Collecting Installation")
 
+	nonRemoved := NonRemoved()
+
 	settings := GetSettingCollection(c.Client)
 
 	uid, _ := GetSettingByCollection(settings, UID_SETTING)
@@ -33,7 +41,9 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 	i.Uid = uid
 	i.Image = "unknown"
 	i.Version = "unknown"
-	//i.AuthConfig = make(LabelCount)
+	i.AuthConfig = make(LabelCount)
+	i.KontainerDrivers = make(LabelCount)
+	i.NodeDrivers = make(LabelCount)
 
 	if image, ok := GetSettingByCollection(settings, SERVER_IMAGE_SETTING); ok {
 		log.Debugf("  Image: %s", image)
@@ -49,17 +59,59 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 		}
 	}
 
-	// @TODO replace with unified authConfig
-	/*authConfig := "none"
-	if enabled, ok := GetSetting(c.Client, "api.security.enabled"); ok {
-		if provider, ok := GetSetting(c.Client, "api.auth.provider.configured"); ok {
-			if enabled == "true" {
-				authConfig = regexp.MustCompile("(?i)^(.*?)config$").ReplaceAllString(provider, "$1")
+	log.Debug("Collecting AuthConfigs")
+	configList, err := c.Client.AuthConfig.List(&nonRemoved)
+	if err == nil {
+		for _, config := range configList.Data {
+			if config.Enabled {
+				name := regexp.MustCompile("(?i)^(.*?)Config$").ReplaceAllString(config.Type, "$1")
+				i.AuthConfig.Increment(name)
 			}
 		}
+	} else {
+		log.Errorf("Failed to get authProviders err=%s", err)
 	}
-	i.AuthConfig.Increment(authConfig)
-	*/
+
+	log.Debug("Collecting NodeDrivers")
+	nodeDriverList, err := c.Client.NodeDriver.List(&nonRemoved)
+	if err == nil {
+		for _, driver := range nodeDriverList.Data {
+			if driver.Active {
+				i.NodeDrivers.Increment(driver.Name)
+				i.NodeDriverCount++
+			}
+		}
+	} else {
+		log.Errorf("Failed to get nodeDrivers err=%s", err)
+	}
+
+	log.Debug("Collecting KontainerDrivers")
+	kontainerDriverList, err := c.Client.KontainerDriver.List(&nonRemoved)
+	if err == nil {
+		for _, driver := range kontainerDriverList.Data {
+			if driver.Active {
+				i.KontainerDrivers.Increment(driver.Name)
+				i.KontainerDriverCount++
+			}
+		}
+	} else {
+		log.Errorf("Failed to get kontainerDrivers err=%s", err)
+	}
+
+	i.HasInternal = false
+
+	log.Debug("Looking for Local cluser")
+	clusterList, err := c.Client.Cluster.List(&nonRemoved)
+	if err == nil {
+		for _, cluster := range clusterList.Data {
+			if cluster.Internal {
+				i.HasInternal = true
+				break
+			}
+		}
+	} else {
+		log.Errorf("Failed to get Clusters err=%s", err)
+	}
 
 	return i
 }

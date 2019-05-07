@@ -128,7 +128,7 @@ func (h Node) Collect(c *CollectorOpts) interface{} {
 		}
 
 		// Driver
-		nodeTemplate := GetNodeTemplate(c.Client, node.NodeTemplateId)
+		nodeTemplate := GetNodeTemplate(c.Client, node.NodeTemplateID)
 		if nodeTemplate != nil {
 			h.FromTmpl++
 			h.Driver.Increment(nodeTemplate.Driver)
@@ -152,6 +152,6 @@ func displayNodeName(m rancher.Node) string {
 	} else if len(m.Hostname) > 0 {
 		return m.Hostname
 	} else {
-		return "(" + m.Uuid + ")"
+		return "(" + m.UUID + ")"
 	}
 }
