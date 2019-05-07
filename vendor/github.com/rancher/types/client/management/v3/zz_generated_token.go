@@ -8,9 +8,12 @@ const (
 	TokenType                 = "token"
 	TokenFieldAnnotations     = "annotations"
 	TokenFieldAuthProvider    = "authProvider"
+	TokenFieldClusterID       = "clusterId"
 	TokenFieldCreated         = "created"
 	TokenFieldCreatorID       = "creatorId"
+	TokenFieldCurrent         = "current"
 	TokenFieldDescription     = "description"
+	TokenFieldEnabled         = "enabled"
 	TokenFieldExpired         = "expired"
 	TokenFieldExpiresAt       = "expiresAt"
 	TokenFieldGroupPrincipals = "groupPrincipals"
@@ -23,18 +26,21 @@ const (
 	TokenFieldRemoved         = "removed"
 	TokenFieldTTLMillis       = "ttl"
 	TokenFieldToken           = "token"
+	TokenFieldUUID            = "uuid"
 	TokenFieldUserID          = "userId"
 	TokenFieldUserPrincipal   = "userPrincipal"
-	TokenFieldUuid            = "uuid"
 )
 
 type Token struct {
 	types.Resource
 	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AuthProvider    string            `json:"authProvider,omitempty" yaml:"authProvider,omitempty"`
+	ClusterID       string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	Current         bool              `json:"current,omitempty" yaml:"current,omitempty"`
 	Description     string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Enabled         *bool             `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Expired         bool              `json:"expired,omitempty" yaml:"expired,omitempty"`
 	ExpiresAt       string            `json:"expiresAt,omitempty" yaml:"expiresAt,omitempty"`
 	GroupPrincipals []string          `json:"groupPrincipals,omitempty" yaml:"groupPrincipals,omitempty"`
@@ -47,10 +53,11 @@ type Token struct {
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	TTLMillis       int64             `json:"ttl,omitempty" yaml:"ttl,omitempty"`
 	Token           string            `json:"token,omitempty" yaml:"token,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	UserID          string            `json:"userId,omitempty" yaml:"userId,omitempty"`
 	UserPrincipal   string            `json:"userPrincipal,omitempty" yaml:"userPrincipal,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type TokenCollection struct {
 	types.Collection
 	Data   []Token `json:"data,omitempty"`
@@ -65,10 +72,11 @@ type TokenOperations interface {
 	List(opts *types.ListOpts) (*TokenCollection, error)
 	Create(opts *Token) (*Token, error)
 	Update(existing *Token, updates interface{}) (*Token, error)
+	Replace(existing *Token) (*Token, error)
 	ByID(id string) (*Token, error)
 	Delete(container *Token) error
 
-	ActionLogout(resource *TokenCollection) error
+	CollectionActionLogout(resource *TokenCollection) error
 }
 
 func newTokenClient(apiClient *Client) *TokenClient {
@@ -86,6 +94,12 @@ func (c *TokenClient) Create(container *Token) (*Token, error) {
 func (c *TokenClient) Update(existing *Token, updates interface{}) (*Token, error) {
 	resp := &Token{}
 	err := c.apiClient.Ops.DoUpdate(TokenType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *TokenClient) Replace(obj *Token) (*Token, error) {
+	resp := &Token{}
+	err := c.apiClient.Ops.DoReplace(TokenType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
@@ -116,8 +130,7 @@ func (c *TokenClient) Delete(container *Token) error {
 	return c.apiClient.Ops.DoResourceDelete(TokenType, &container.Resource)
 }
 
-func (c *TokenClient) ActionLogout(resource *TokenCollection) error {
+func (c *TokenClient) CollectionActionLogout(resource *TokenCollection) error {
 	err := c.apiClient.Ops.DoCollectionAction(TokenType, "logout", &resource.Collection, nil, nil)
 	return err
-
 }

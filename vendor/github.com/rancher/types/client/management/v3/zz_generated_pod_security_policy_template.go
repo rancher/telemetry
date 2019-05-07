@@ -8,7 +8,10 @@ const (
 	PodSecurityPolicyTemplateType                                 = "podSecurityPolicyTemplate"
 	PodSecurityPolicyTemplateFieldAllowPrivilegeEscalation        = "allowPrivilegeEscalation"
 	PodSecurityPolicyTemplateFieldAllowedCapabilities             = "allowedCapabilities"
+	PodSecurityPolicyTemplateFieldAllowedFlexVolumes              = "allowedFlexVolumes"
 	PodSecurityPolicyTemplateFieldAllowedHostPaths                = "allowedHostPaths"
+	PodSecurityPolicyTemplateFieldAllowedProcMountTypes           = "allowedProcMountTypes"
+	PodSecurityPolicyTemplateFieldAllowedUnsafeSysctls            = "allowedUnsafeSysctls"
 	PodSecurityPolicyTemplateFieldAnnotations                     = "annotations"
 	PodSecurityPolicyTemplateFieldCreated                         = "created"
 	PodSecurityPolicyTemplateFieldCreatorID                       = "creatorId"
@@ -16,6 +19,7 @@ const (
 	PodSecurityPolicyTemplateFieldDefaultAllowPrivilegeEscalation = "defaultAllowPrivilegeEscalation"
 	PodSecurityPolicyTemplateFieldDescription                     = "description"
 	PodSecurityPolicyTemplateFieldFSGroup                         = "fsGroup"
+	PodSecurityPolicyTemplateFieldForbiddenSysctls                = "forbiddenSysctls"
 	PodSecurityPolicyTemplateFieldHostIPC                         = "hostIPC"
 	PodSecurityPolicyTemplateFieldHostNetwork                     = "hostNetwork"
 	PodSecurityPolicyTemplateFieldHostPID                         = "hostPID"
@@ -30,7 +34,7 @@ const (
 	PodSecurityPolicyTemplateFieldRunAsUser                       = "runAsUser"
 	PodSecurityPolicyTemplateFieldSELinux                         = "seLinux"
 	PodSecurityPolicyTemplateFieldSupplementalGroups              = "supplementalGroups"
-	PodSecurityPolicyTemplateFieldUuid                            = "uuid"
+	PodSecurityPolicyTemplateFieldUUID                            = "uuid"
 	PodSecurityPolicyTemplateFieldVolumes                         = "volumes"
 )
 
@@ -38,7 +42,10 @@ type PodSecurityPolicyTemplate struct {
 	types.Resource
 	AllowPrivilegeEscalation        *bool                              `json:"allowPrivilegeEscalation,omitempty" yaml:"allowPrivilegeEscalation,omitempty"`
 	AllowedCapabilities             []string                           `json:"allowedCapabilities,omitempty" yaml:"allowedCapabilities,omitempty"`
+	AllowedFlexVolumes              []AllowedFlexVolume                `json:"allowedFlexVolumes,omitempty" yaml:"allowedFlexVolumes,omitempty"`
 	AllowedHostPaths                []AllowedHostPath                  `json:"allowedHostPaths,omitempty" yaml:"allowedHostPaths,omitempty"`
+	AllowedProcMountTypes           []string                           `json:"allowedProcMountTypes,omitempty" yaml:"allowedProcMountTypes,omitempty"`
+	AllowedUnsafeSysctls            []string                           `json:"allowedUnsafeSysctls,omitempty" yaml:"allowedUnsafeSysctls,omitempty"`
 	Annotations                     map[string]string                  `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created                         string                             `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                       string                             `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
@@ -46,6 +53,7 @@ type PodSecurityPolicyTemplate struct {
 	DefaultAllowPrivilegeEscalation *bool                              `json:"defaultAllowPrivilegeEscalation,omitempty" yaml:"defaultAllowPrivilegeEscalation,omitempty"`
 	Description                     string                             `json:"description,omitempty" yaml:"description,omitempty"`
 	FSGroup                         *FSGroupStrategyOptions            `json:"fsGroup,omitempty" yaml:"fsGroup,omitempty"`
+	ForbiddenSysctls                []string                           `json:"forbiddenSysctls,omitempty" yaml:"forbiddenSysctls,omitempty"`
 	HostIPC                         bool                               `json:"hostIPC,omitempty" yaml:"hostIPC,omitempty"`
 	HostNetwork                     bool                               `json:"hostNetwork,omitempty" yaml:"hostNetwork,omitempty"`
 	HostPID                         bool                               `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
@@ -60,9 +68,10 @@ type PodSecurityPolicyTemplate struct {
 	RunAsUser                       *RunAsUserStrategyOptions          `json:"runAsUser,omitempty" yaml:"runAsUser,omitempty"`
 	SELinux                         *SELinuxStrategyOptions            `json:"seLinux,omitempty" yaml:"seLinux,omitempty"`
 	SupplementalGroups              *SupplementalGroupsStrategyOptions `json:"supplementalGroups,omitempty" yaml:"supplementalGroups,omitempty"`
-	Uuid                            string                             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                            string                             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	Volumes                         []string                           `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 }
+
 type PodSecurityPolicyTemplateCollection struct {
 	types.Collection
 	Data   []PodSecurityPolicyTemplate `json:"data,omitempty"`
@@ -77,6 +86,7 @@ type PodSecurityPolicyTemplateOperations interface {
 	List(opts *types.ListOpts) (*PodSecurityPolicyTemplateCollection, error)
 	Create(opts *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
 	Update(existing *PodSecurityPolicyTemplate, updates interface{}) (*PodSecurityPolicyTemplate, error)
+	Replace(existing *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error)
 	ByID(id string) (*PodSecurityPolicyTemplate, error)
 	Delete(container *PodSecurityPolicyTemplate) error
 }
@@ -96,6 +106,12 @@ func (c *PodSecurityPolicyTemplateClient) Create(container *PodSecurityPolicyTem
 func (c *PodSecurityPolicyTemplateClient) Update(existing *PodSecurityPolicyTemplate, updates interface{}) (*PodSecurityPolicyTemplate, error) {
 	resp := &PodSecurityPolicyTemplate{}
 	err := c.apiClient.Ops.DoUpdate(PodSecurityPolicyTemplateType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PodSecurityPolicyTemplateClient) Replace(obj *PodSecurityPolicyTemplate) (*PodSecurityPolicyTemplate, error) {
+	resp := &PodSecurityPolicyTemplate{}
+	err := c.apiClient.Ops.DoReplace(PodSecurityPolicyTemplateType, &obj.Resource, obj, resp)
 	return resp, err
 }
 

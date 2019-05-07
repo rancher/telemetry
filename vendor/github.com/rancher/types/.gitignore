@@ -6,3 +6,5 @@
 /.idea
 /trash.lock
 /types
+*trash.lock
+.vscode/

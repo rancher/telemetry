@@ -18,12 +18,14 @@ const (
 	CatalogFieldLastRefreshTimestamp = "lastRefreshTimestamp"
 	CatalogFieldName                 = "name"
 	CatalogFieldOwnerReferences      = "ownerReferences"
+	CatalogFieldPassword             = "password"
 	CatalogFieldRemoved              = "removed"
 	CatalogFieldState                = "state"
 	CatalogFieldTransitioning        = "transitioning"
 	CatalogFieldTransitioningMessage = "transitioningMessage"
 	CatalogFieldURL                  = "url"
-	CatalogFieldUuid                 = "uuid"
+	CatalogFieldUUID                 = "uuid"
+	CatalogFieldUsername             = "username"
 )
 
 type Catalog struct {
@@ -40,13 +42,16 @@ type Catalog struct {
 	LastRefreshTimestamp string             `json:"lastRefreshTimestamp,omitempty" yaml:"lastRefreshTimestamp,omitempty"`
 	Name                 string             `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences      []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Password             string             `json:"password,omitempty" yaml:"password,omitempty"`
 	Removed              string             `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                string             `json:"state,omitempty" yaml:"state,omitempty"`
 	Transitioning        string             `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string             `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	URL                  string             `json:"url,omitempty" yaml:"url,omitempty"`
-	Uuid                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string             `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Username             string             `json:"username,omitempty" yaml:"username,omitempty"`
 }
+
 type CatalogCollection struct {
 	types.Collection
 	Data   []Catalog `json:"data,omitempty"`
@@ -61,10 +66,13 @@ type CatalogOperations interface {
 	List(opts *types.ListOpts) (*CatalogCollection, error)
 	Create(opts *Catalog) (*Catalog, error)
 	Update(existing *Catalog, updates interface{}) (*Catalog, error)
+	Replace(existing *Catalog) (*Catalog, error)
 	ByID(id string) (*Catalog, error)
 	Delete(container *Catalog) error
 
-	ActionRefresh(resource *CatalogCollection) error
+	ActionRefresh(resource *Catalog) error
+
+	CollectionActionRefresh(resource *CatalogCollection) error
 }
 
 func newCatalogClient(apiClient *Client) *CatalogClient {
@@ -82,6 +90,12 @@ func (c *CatalogClient) Create(container *Catalog) (*Catalog, error) {
 func (c *CatalogClient) Update(existing *Catalog, updates interface{}) (*Catalog, error) {
 	resp := &Catalog{}
 	err := c.apiClient.Ops.DoUpdate(CatalogType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *CatalogClient) Replace(obj *Catalog) (*Catalog, error) {
+	resp := &Catalog{}
+	err := c.apiClient.Ops.DoReplace(CatalogType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
@@ -112,8 +126,12 @@ func (c *CatalogClient) Delete(container *Catalog) error {
 	return c.apiClient.Ops.DoResourceDelete(CatalogType, &container.Resource)
 }
 
-func (c *CatalogClient) ActionRefresh(resource *CatalogCollection) error {
+func (c *CatalogClient) ActionRefresh(resource *Catalog) error {
+	err := c.apiClient.Ops.DoAction(CatalogType, "refresh", &resource.Resource, nil, nil)
+	return err
+}
+
+func (c *CatalogClient) CollectionActionRefresh(resource *CatalogCollection) error {
 	err := c.apiClient.Ops.DoCollectionAction(CatalogType, "refresh", &resource.Collection, nil, nil)
 	return err
-
 }

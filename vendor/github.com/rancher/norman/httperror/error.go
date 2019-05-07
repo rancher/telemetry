@@ -9,6 +9,7 @@ var (
 	PermissionDenied = ErrorCode{"PermissionDenied", 403}
 	NotFound         = ErrorCode{"NotFound", 404}
 	MethodNotAllowed = ErrorCode{"MethodNotAllow", 405}
+	Conflict         = ErrorCode{"Conflict", 409}
 
 	InvalidDateFormat  = ErrorCode{"InvalidDateFormat", 422}
 	InvalidFormat      = ErrorCode{"InvalidFormat", 422}
@@ -102,6 +103,14 @@ func (a *APIError) Error() string {
 func IsAPIError(err error) bool {
 	_, ok := err.(*APIError)
 	return ok
+}
+
+func IsNotFound(err error) bool {
+	if apiError, ok := err.(*APIError); ok {
+		return apiError.Code.Status == 404
+	}
+
+	return false
 }
 
 func IsConflict(err error) bool {
