@@ -21,7 +21,7 @@ const (
 	PrincipalFieldProfileURL      = "profileURL"
 	PrincipalFieldProvider        = "provider"
 	PrincipalFieldRemoved         = "removed"
-	PrincipalFieldUuid            = "uuid"
+	PrincipalFieldUUID            = "uuid"
 )
 
 type Principal struct {
@@ -41,8 +41,9 @@ type Principal struct {
 	ProfileURL      string            `json:"profileURL,omitempty" yaml:"profileURL,omitempty"`
 	Provider        string            `json:"provider,omitempty" yaml:"provider,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
-	Uuid            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type PrincipalCollection struct {
 	types.Collection
 	Data   []Principal `json:"data,omitempty"`
@@ -57,10 +58,11 @@ type PrincipalOperations interface {
 	List(opts *types.ListOpts) (*PrincipalCollection, error)
 	Create(opts *Principal) (*Principal, error)
 	Update(existing *Principal, updates interface{}) (*Principal, error)
+	Replace(existing *Principal) (*Principal, error)
 	ByID(id string) (*Principal, error)
 	Delete(container *Principal) error
 
-	ActionSearch(resource *PrincipalCollection, input *SearchPrincipalsInput) (*PrincipalCollection, error)
+	CollectionActionSearch(resource *PrincipalCollection, input *SearchPrincipalsInput) (*PrincipalCollection, error)
 }
 
 func newPrincipalClient(apiClient *Client) *PrincipalClient {
@@ -78,6 +80,12 @@ func (c *PrincipalClient) Create(container *Principal) (*Principal, error) {
 func (c *PrincipalClient) Update(existing *Principal, updates interface{}) (*Principal, error) {
 	resp := &Principal{}
 	err := c.apiClient.Ops.DoUpdate(PrincipalType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *PrincipalClient) Replace(obj *Principal) (*Principal, error) {
+	resp := &Principal{}
+	err := c.apiClient.Ops.DoReplace(PrincipalType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
@@ -108,9 +116,8 @@ func (c *PrincipalClient) Delete(container *Principal) error {
 	return c.apiClient.Ops.DoResourceDelete(PrincipalType, &container.Resource)
 }
 
-func (c *PrincipalClient) ActionSearch(resource *PrincipalCollection, input *SearchPrincipalsInput) (*PrincipalCollection, error) {
+func (c *PrincipalClient) CollectionActionSearch(resource *PrincipalCollection, input *SearchPrincipalsInput) (*PrincipalCollection, error) {
 	resp := &PrincipalCollection{}
 	err := c.apiClient.Ops.DoCollectionAction(PrincipalType, "search", &resource.Collection, input, resp)
 	return resp, err
-
 }

@@ -7,7 +7,7 @@ import (
 const (
 	NotifierType                      = "notifier"
 	NotifierFieldAnnotations          = "annotations"
-	NotifierFieldClusterId            = "clusterId"
+	NotifierFieldClusterID            = "clusterId"
 	NotifierFieldCreated              = "created"
 	NotifierFieldCreatorID            = "creatorId"
 	NotifierFieldDescription          = "description"
@@ -23,14 +23,15 @@ const (
 	NotifierFieldStatus               = "status"
 	NotifierFieldTransitioning        = "transitioning"
 	NotifierFieldTransitioningMessage = "transitioningMessage"
-	NotifierFieldUuid                 = "uuid"
+	NotifierFieldUUID                 = "uuid"
 	NotifierFieldWebhookConfig        = "webhookConfig"
+	NotifierFieldWechatConfig         = "wechatConfig"
 )
 
 type Notifier struct {
 	types.Resource
 	Annotations          map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID            string            `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Created              string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
@@ -46,9 +47,11 @@ type Notifier struct {
 	Status               *NotifierStatus   `json:"status,omitempty" yaml:"status,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 	WebhookConfig        *WebhookConfig    `json:"webhookConfig,omitempty" yaml:"webhookConfig,omitempty"`
+	WechatConfig         *WechatConfig     `json:"wechatConfig,omitempty" yaml:"wechatConfig,omitempty"`
 }
+
 type NotifierCollection struct {
 	types.Collection
 	Data   []Notifier `json:"data,omitempty"`
@@ -63,10 +66,13 @@ type NotifierOperations interface {
 	List(opts *types.ListOpts) (*NotifierCollection, error)
 	Create(opts *Notifier) (*Notifier, error)
 	Update(existing *Notifier, updates interface{}) (*Notifier, error)
+	Replace(existing *Notifier) (*Notifier, error)
 	ByID(id string) (*Notifier, error)
 	Delete(container *Notifier) error
 
-	ActionSend(resource *NotifierCollection, input *Notification) error
+	ActionSend(resource *Notifier, input *Notification) error
+
+	CollectionActionSend(resource *NotifierCollection, input *Notification) error
 }
 
 func newNotifierClient(apiClient *Client) *NotifierClient {
@@ -84,6 +90,12 @@ func (c *NotifierClient) Create(container *Notifier) (*Notifier, error) {
 func (c *NotifierClient) Update(existing *Notifier, updates interface{}) (*Notifier, error) {
 	resp := &Notifier{}
 	err := c.apiClient.Ops.DoUpdate(NotifierType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *NotifierClient) Replace(obj *Notifier) (*Notifier, error) {
+	resp := &Notifier{}
+	err := c.apiClient.Ops.DoReplace(NotifierType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
@@ -114,8 +126,12 @@ func (c *NotifierClient) Delete(container *Notifier) error {
 	return c.apiClient.Ops.DoResourceDelete(NotifierType, &container.Resource)
 }
 
-func (c *NotifierClient) ActionSend(resource *NotifierCollection, input *Notification) error {
+func (c *NotifierClient) ActionSend(resource *Notifier, input *Notification) error {
+	err := c.apiClient.Ops.DoAction(NotifierType, "send", &resource.Resource, input, nil)
+	return err
+}
+
+func (c *NotifierClient) CollectionActionSend(resource *NotifierCollection, input *Notification) error {
 	err := c.apiClient.Ops.DoCollectionAction(NotifierType, "send", &resource.Collection, input, nil)
 	return err
-
 }

@@ -5,54 +5,63 @@ import (
 )
 
 const (
-	ClusterLoggingType                      = "clusterLogging"
-	ClusterLoggingFieldAnnotations          = "annotations"
-	ClusterLoggingFieldClusterId            = "clusterId"
-	ClusterLoggingFieldCreated              = "created"
-	ClusterLoggingFieldCreatorID            = "creatorId"
-	ClusterLoggingFieldElasticsearchConfig  = "elasticsearchConfig"
-	ClusterLoggingFieldEmbeddedConfig       = "embeddedConfig"
-	ClusterLoggingFieldKafkaConfig          = "kafkaConfig"
-	ClusterLoggingFieldLabels               = "labels"
-	ClusterLoggingFieldName                 = "name"
-	ClusterLoggingFieldNamespaceId          = "namespaceId"
-	ClusterLoggingFieldOutputFlushInterval  = "outputFlushInterval"
-	ClusterLoggingFieldOutputTags           = "outputTags"
-	ClusterLoggingFieldOwnerReferences      = "ownerReferences"
-	ClusterLoggingFieldRemoved              = "removed"
-	ClusterLoggingFieldSplunkConfig         = "splunkConfig"
-	ClusterLoggingFieldState                = "state"
-	ClusterLoggingFieldStatus               = "status"
-	ClusterLoggingFieldSyslogConfig         = "syslogConfig"
-	ClusterLoggingFieldTransitioning        = "transitioning"
-	ClusterLoggingFieldTransitioningMessage = "transitioningMessage"
-	ClusterLoggingFieldUuid                 = "uuid"
+	ClusterLoggingType                        = "clusterLogging"
+	ClusterLoggingFieldAnnotations            = "annotations"
+	ClusterLoggingFieldAppliedSpec            = "appliedSpec"
+	ClusterLoggingFieldClusterID              = "clusterId"
+	ClusterLoggingFieldConditions             = "conditions"
+	ClusterLoggingFieldCreated                = "created"
+	ClusterLoggingFieldCreatorID              = "creatorId"
+	ClusterLoggingFieldCustomTargetConfig     = "customTargetConfig"
+	ClusterLoggingFieldElasticsearchConfig    = "elasticsearchConfig"
+	ClusterLoggingFieldFailedSpec             = "failedSpec"
+	ClusterLoggingFieldFluentForwarderConfig  = "fluentForwarderConfig"
+	ClusterLoggingFieldIncludeSystemComponent = "includeSystemComponent"
+	ClusterLoggingFieldKafkaConfig            = "kafkaConfig"
+	ClusterLoggingFieldLabels                 = "labels"
+	ClusterLoggingFieldName                   = "name"
+	ClusterLoggingFieldNamespaceId            = "namespaceId"
+	ClusterLoggingFieldOutputFlushInterval    = "outputFlushInterval"
+	ClusterLoggingFieldOutputTags             = "outputTags"
+	ClusterLoggingFieldOwnerReferences        = "ownerReferences"
+	ClusterLoggingFieldRemoved                = "removed"
+	ClusterLoggingFieldSplunkConfig           = "splunkConfig"
+	ClusterLoggingFieldState                  = "state"
+	ClusterLoggingFieldSyslogConfig           = "syslogConfig"
+	ClusterLoggingFieldTransitioning          = "transitioning"
+	ClusterLoggingFieldTransitioningMessage   = "transitioningMessage"
+	ClusterLoggingFieldUUID                   = "uuid"
 )
 
 type ClusterLogging struct {
 	types.Resource
-	Annotations          map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId            string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
-	Created              string               `json:"created,omitempty" yaml:"created,omitempty"`
-	CreatorID            string               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
-	ElasticsearchConfig  *ElasticsearchConfig `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
-	EmbeddedConfig       *EmbeddedConfig      `json:"embeddedConfig,omitempty" yaml:"embeddedConfig,omitempty"`
-	KafkaConfig          *KafkaConfig         `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
-	Labels               map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Name                 string               `json:"name,omitempty" yaml:"name,omitempty"`
-	NamespaceId          string               `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
-	OutputFlushInterval  int64                `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`
-	OutputTags           map[string]string    `json:"outputTags,omitempty" yaml:"outputTags,omitempty"`
-	OwnerReferences      []OwnerReference     `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Removed              string               `json:"removed,omitempty" yaml:"removed,omitempty"`
-	SplunkConfig         *SplunkConfig        `json:"splunkConfig,omitempty" yaml:"splunkConfig,omitempty"`
-	State                string               `json:"state,omitempty" yaml:"state,omitempty"`
-	Status               *LoggingStatus       `json:"status,omitempty" yaml:"status,omitempty"`
-	SyslogConfig         *SyslogConfig        `json:"syslogConfig,omitempty" yaml:"syslogConfig,omitempty"`
-	Transitioning        string               `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
-	TransitioningMessage string               `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                 string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	Annotations            map[string]string      `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	AppliedSpec            *ClusterLoggingSpec    `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
+	ClusterID              string                 `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	Conditions             []LoggingCondition     `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Created                string                 `json:"created,omitempty" yaml:"created,omitempty"`
+	CreatorID              string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	CustomTargetConfig     *CustomTargetConfig    `json:"customTargetConfig,omitempty" yaml:"customTargetConfig,omitempty"`
+	ElasticsearchConfig    *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
+	FailedSpec             *ClusterLoggingSpec    `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
+	FluentForwarderConfig  *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`
+	IncludeSystemComponent *bool                  `json:"includeSystemComponent,omitempty" yaml:"includeSystemComponent,omitempty"`
+	KafkaConfig            *KafkaConfig           `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
+	Labels                 map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Name                   string                 `json:"name,omitempty" yaml:"name,omitempty"`
+	NamespaceId            string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
+	OutputFlushInterval    int64                  `json:"outputFlushInterval,omitempty" yaml:"outputFlushInterval,omitempty"`
+	OutputTags             map[string]string      `json:"outputTags,omitempty" yaml:"outputTags,omitempty"`
+	OwnerReferences        []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Removed                string                 `json:"removed,omitempty" yaml:"removed,omitempty"`
+	SplunkConfig           *SplunkConfig          `json:"splunkConfig,omitempty" yaml:"splunkConfig,omitempty"`
+	State                  string                 `json:"state,omitempty" yaml:"state,omitempty"`
+	SyslogConfig           *SyslogConfig          `json:"syslogConfig,omitempty" yaml:"syslogConfig,omitempty"`
+	Transitioning          string                 `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
+	TransitioningMessage   string                 `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
+	UUID                   string                 `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ClusterLoggingCollection struct {
 	types.Collection
 	Data   []ClusterLogging `json:"data,omitempty"`
@@ -67,8 +76,13 @@ type ClusterLoggingOperations interface {
 	List(opts *types.ListOpts) (*ClusterLoggingCollection, error)
 	Create(opts *ClusterLogging) (*ClusterLogging, error)
 	Update(existing *ClusterLogging, updates interface{}) (*ClusterLogging, error)
+	Replace(existing *ClusterLogging) (*ClusterLogging, error)
 	ByID(id string) (*ClusterLogging, error)
 	Delete(container *ClusterLogging) error
+
+	CollectionActionDryRun(resource *ClusterLoggingCollection, input *ClusterTestInput) error
+
+	CollectionActionTest(resource *ClusterLoggingCollection, input *ClusterTestInput) error
 }
 
 func newClusterLoggingClient(apiClient *Client) *ClusterLoggingClient {
@@ -86,6 +100,12 @@ func (c *ClusterLoggingClient) Create(container *ClusterLogging) (*ClusterLoggin
 func (c *ClusterLoggingClient) Update(existing *ClusterLogging, updates interface{}) (*ClusterLogging, error) {
 	resp := &ClusterLogging{}
 	err := c.apiClient.Ops.DoUpdate(ClusterLoggingType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ClusterLoggingClient) Replace(obj *ClusterLogging) (*ClusterLogging, error) {
+	resp := &ClusterLogging{}
+	err := c.apiClient.Ops.DoReplace(ClusterLoggingType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
@@ -114,4 +134,14 @@ func (c *ClusterLoggingClient) ByID(id string) (*ClusterLogging, error) {
 
 func (c *ClusterLoggingClient) Delete(container *ClusterLogging) error {
 	return c.apiClient.Ops.DoResourceDelete(ClusterLoggingType, &container.Resource)
+}
+
+func (c *ClusterLoggingClient) CollectionActionDryRun(resource *ClusterLoggingCollection, input *ClusterTestInput) error {
+	err := c.apiClient.Ops.DoCollectionAction(ClusterLoggingType, "dryRun", &resource.Collection, input, nil)
+	return err
+}
+
+func (c *ClusterLoggingClient) CollectionActionTest(resource *ClusterLoggingCollection, input *ClusterTestInput) error {
+	err := c.apiClient.Ops.DoCollectionAction(ClusterLoggingType, "test", &resource.Collection, input, nil)
+	return err
 }

@@ -6,12 +6,12 @@ import (
 
 const (
 	ClusterAlertType                       = "clusterAlert"
-	ClusterAlertFieldAlertState            = "alertState"
 	ClusterAlertFieldAnnotations           = "annotations"
-	ClusterAlertFieldClusterId             = "clusterId"
+	ClusterAlertFieldClusterID             = "clusterId"
 	ClusterAlertFieldCreated               = "created"
 	ClusterAlertFieldCreatorID             = "creatorId"
 	ClusterAlertFieldDescription           = "description"
+	ClusterAlertFieldDisplayName           = "displayName"
 	ClusterAlertFieldInitialWaitSeconds    = "initialWaitSeconds"
 	ClusterAlertFieldLabels                = "labels"
 	ClusterAlertFieldName                  = "name"
@@ -22,22 +22,23 @@ const (
 	ClusterAlertFieldRepeatIntervalSeconds = "repeatIntervalSeconds"
 	ClusterAlertFieldSeverity              = "severity"
 	ClusterAlertFieldState                 = "state"
+	ClusterAlertFieldStatus                = "status"
 	ClusterAlertFieldTargetEvent           = "targetEvent"
 	ClusterAlertFieldTargetNode            = "targetNode"
 	ClusterAlertFieldTargetSystemService   = "targetSystemService"
 	ClusterAlertFieldTransitioning         = "transitioning"
 	ClusterAlertFieldTransitioningMessage  = "transitioningMessage"
-	ClusterAlertFieldUuid                  = "uuid"
+	ClusterAlertFieldUUID                  = "uuid"
 )
 
 type ClusterAlert struct {
 	types.Resource
-	AlertState            string               `json:"alertState,omitempty" yaml:"alertState,omitempty"`
 	Annotations           map[string]string    `json:"annotations,omitempty" yaml:"annotations,omitempty"`
-	ClusterId             string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
+	ClusterID             string               `json:"clusterId,omitempty" yaml:"clusterId,omitempty"`
 	Created               string               `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID             string               `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Description           string               `json:"description,omitempty" yaml:"description,omitempty"`
+	DisplayName           string               `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	InitialWaitSeconds    int64                `json:"initialWaitSeconds,omitempty" yaml:"initialWaitSeconds,omitempty"`
 	Labels                map[string]string    `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                  string               `json:"name,omitempty" yaml:"name,omitempty"`
@@ -48,13 +49,15 @@ type ClusterAlert struct {
 	RepeatIntervalSeconds int64                `json:"repeatIntervalSeconds,omitempty" yaml:"repeatIntervalSeconds,omitempty"`
 	Severity              string               `json:"severity,omitempty" yaml:"severity,omitempty"`
 	State                 string               `json:"state,omitempty" yaml:"state,omitempty"`
+	Status                *AlertStatus         `json:"status,omitempty" yaml:"status,omitempty"`
 	TargetEvent           *TargetEvent         `json:"targetEvent,omitempty" yaml:"targetEvent,omitempty"`
 	TargetNode            *TargetNode          `json:"targetNode,omitempty" yaml:"targetNode,omitempty"`
 	TargetSystemService   *TargetSystemService `json:"targetSystemService,omitempty" yaml:"targetSystemService,omitempty"`
 	Transitioning         string               `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage  string               `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
-	Uuid                  string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
+	UUID                  string               `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
+
 type ClusterAlertCollection struct {
 	types.Collection
 	Data   []ClusterAlert `json:"data,omitempty"`
@@ -69,6 +72,7 @@ type ClusterAlertOperations interface {
 	List(opts *types.ListOpts) (*ClusterAlertCollection, error)
 	Create(opts *ClusterAlert) (*ClusterAlert, error)
 	Update(existing *ClusterAlert, updates interface{}) (*ClusterAlert, error)
+	Replace(existing *ClusterAlert) (*ClusterAlert, error)
 	ByID(id string) (*ClusterAlert, error)
 	Delete(container *ClusterAlert) error
 }
@@ -88,6 +92,12 @@ func (c *ClusterAlertClient) Create(container *ClusterAlert) (*ClusterAlert, err
 func (c *ClusterAlertClient) Update(existing *ClusterAlert, updates interface{}) (*ClusterAlert, error) {
 	resp := &ClusterAlert{}
 	err := c.apiClient.Ops.DoUpdate(ClusterAlertType, &existing.Resource, updates, resp)
+	return resp, err
+}
+
+func (c *ClusterAlertClient) Replace(obj *ClusterAlert) (*ClusterAlert, error) {
+	resp := &ClusterAlert{}
+	err := c.apiClient.Ops.DoReplace(ClusterAlertType, &obj.Resource, obj, resp)
 	return resp, err
 }
 
