@@ -47,31 +47,24 @@ func (mca MultiClusterApp) Collect(c *CollectorOpts) interface{} {
 		mca.TargetAvg = Average(targetCounts)
 	} else {
 		log.Errorf("Failed to get Apps err=%s", err)
-		return nil
 	}
 
-	// Global DNS Providers
+	// Global DNS Providers (only with management cluster, so ignore errors)
 	log.Debug("Collecting DNS Providers")
 	dnsList, err := c.Client.GlobalDNSProvider.List(&nonRemoved)
 	if err == nil {
 		count := len(dnsList.Data)
 		log.Debugf("  Found %d DNS Providers", count)
 		mca.DnsProviders = count
-	} else {
-		log.Errorf("Failed to get DNS Providers err=%s", err)
-		return nil
 	}
 
-	// Global DNS Entries
+	// Global DNS Entries (only with management cluster, so ignore errors)
 	log.Debug("Collecting DNS Entries")
 	entryList, err := c.Client.GlobalDNS.List(&nonRemoved)
 	if err == nil {
 		count := len(entryList.Data)
 		log.Debugf("  Found %d DNS Entries", count)
 		mca.DnsEntries = count
-	} else {
-		log.Errorf("Failed to get DNS Entries err=%s", err)
-		return nil
 	}
 
 	return mca
