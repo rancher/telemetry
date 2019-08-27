@@ -16,6 +16,7 @@ const (
 	DeploymentFieldDNSPolicy                     = "dnsPolicy"
 	DeploymentFieldDeploymentConfig              = "deploymentConfig"
 	DeploymentFieldDeploymentStatus              = "deploymentStatus"
+	DeploymentFieldEnableServiceLinks            = "enableServiceLinks"
 	DeploymentFieldFsgid                         = "fsgid"
 	DeploymentFieldGids                          = "gids"
 	DeploymentFieldHostAliases                   = "hostAliases"
@@ -30,8 +31,6 @@ const (
 	DeploymentFieldNodeID                        = "nodeId"
 	DeploymentFieldOwnerReferences               = "ownerReferences"
 	DeploymentFieldPaused                        = "paused"
-	DeploymentFieldPriority                      = "priority"
-	DeploymentFieldPriorityClassName             = "priorityClassName"
 	DeploymentFieldProjectID                     = "projectId"
 	DeploymentFieldPublicEndpoints               = "publicEndpoints"
 	DeploymentFieldReadinessGates                = "readinessGates"
@@ -41,7 +40,6 @@ const (
 	DeploymentFieldRunAsNonRoot                  = "runAsNonRoot"
 	DeploymentFieldRuntimeClassName              = "runtimeClassName"
 	DeploymentFieldScale                         = "scale"
-	DeploymentFieldSchedulerName                 = "schedulerName"
 	DeploymentFieldScheduling                    = "scheduling"
 	DeploymentFieldSelector                      = "selector"
 	DeploymentFieldServiceAccountName            = "serviceAccountName"
@@ -72,6 +70,7 @@ type Deployment struct {
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
 	DeploymentConfig              *DeploymentConfig      `json:"deploymentConfig,omitempty" yaml:"deploymentConfig,omitempty"`
 	DeploymentStatus              *DeploymentStatus      `json:"deploymentStatus,omitempty" yaml:"deploymentStatus,omitempty"`
+	EnableServiceLinks            *bool                  `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`
 	HostAliases                   []HostAlias            `json:"hostAliases,omitempty" yaml:"hostAliases,omitempty"`
@@ -86,8 +85,6 @@ type Deployment struct {
 	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	Paused                        bool                   `json:"paused,omitempty" yaml:"paused,omitempty"`
-	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
-	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	ReadinessGates                []PodReadinessGate     `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
@@ -97,7 +94,6 @@ type Deployment struct {
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                 `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
 	Scale                         *int64                 `json:"scale,omitempty" yaml:"scale,omitempty"`
-	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`

@@ -16,6 +16,7 @@ const (
 	CronJobFieldCronJobStatus                 = "cronJobStatus"
 	CronJobFieldDNSConfig                     = "dnsConfig"
 	CronJobFieldDNSPolicy                     = "dnsPolicy"
+	CronJobFieldEnableServiceLinks            = "enableServiceLinks"
 	CronJobFieldFsgid                         = "fsgid"
 	CronJobFieldGids                          = "gids"
 	CronJobFieldHostAliases                   = "hostAliases"
@@ -29,8 +30,6 @@ const (
 	CronJobFieldNamespaceId                   = "namespaceId"
 	CronJobFieldNodeID                        = "nodeId"
 	CronJobFieldOwnerReferences               = "ownerReferences"
-	CronJobFieldPriority                      = "priority"
-	CronJobFieldPriorityClassName             = "priorityClassName"
 	CronJobFieldProjectID                     = "projectId"
 	CronJobFieldPublicEndpoints               = "publicEndpoints"
 	CronJobFieldReadinessGates                = "readinessGates"
@@ -39,7 +38,6 @@ const (
 	CronJobFieldRunAsGroup                    = "runAsGroup"
 	CronJobFieldRunAsNonRoot                  = "runAsNonRoot"
 	CronJobFieldRuntimeClassName              = "runtimeClassName"
-	CronJobFieldSchedulerName                 = "schedulerName"
 	CronJobFieldScheduling                    = "scheduling"
 	CronJobFieldSelector                      = "selector"
 	CronJobFieldServiceAccountName            = "serviceAccountName"
@@ -71,6 +69,7 @@ type CronJob struct {
 	CronJobStatus                 *CronJobStatus         `json:"cronJobStatus,omitempty" yaml:"cronJobStatus,omitempty"`
 	DNSConfig                     *PodDNSConfig          `json:"dnsConfig,omitempty" yaml:"dnsConfig,omitempty"`
 	DNSPolicy                     string                 `json:"dnsPolicy,omitempty" yaml:"dnsPolicy,omitempty"`
+	EnableServiceLinks            *bool                  `json:"enableServiceLinks,omitempty" yaml:"enableServiceLinks,omitempty"`
 	Fsgid                         *int64                 `json:"fsgid,omitempty" yaml:"fsgid,omitempty"`
 	Gids                          []int64                `json:"gids,omitempty" yaml:"gids,omitempty"`
 	HostAliases                   []HostAlias            `json:"hostAliases,omitempty" yaml:"hostAliases,omitempty"`
@@ -84,8 +83,6 @@ type CronJob struct {
 	NamespaceId                   string                 `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
 	NodeID                        string                 `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OwnerReferences               []OwnerReference       `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	Priority                      *int64                 `json:"priority,omitempty" yaml:"priority,omitempty"`
-	PriorityClassName             string                 `json:"priorityClassName,omitempty" yaml:"priorityClassName,omitempty"`
 	ProjectID                     string                 `json:"projectId,omitempty" yaml:"projectId,omitempty"`
 	PublicEndpoints               []PublicEndpoint       `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	ReadinessGates                []PodReadinessGate     `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
@@ -94,7 +91,6 @@ type CronJob struct {
 	RunAsGroup                    *int64                 `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot                  *bool                  `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	RuntimeClassName              string                 `json:"runtimeClassName,omitempty" yaml:"runtimeClassName,omitempty"`
-	SchedulerName                 string                 `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	Scheduling                    *Scheduling            `json:"scheduling,omitempty" yaml:"scheduling,omitempty"`
 	Selector                      *LabelSelector         `json:"selector,omitempty" yaml:"selector,omitempty"`
 	ServiceAccountName            string                 `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
