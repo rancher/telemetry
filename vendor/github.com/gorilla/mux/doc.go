@@ -287,7 +287,7 @@ A more complex authentication middleware, which maps session token to users, cou
 				log.Printf("Authenticated user %s\n", user)
 				next.ServeHTTP(w, r)
 			} else {
-				http.Error(w, "Forbidden", 403)
+				http.Error(w, "Forbidden", http.StatusForbidden)
 			}
 		})
 	}
@@ -295,7 +295,7 @@ A more complex authentication middleware, which maps session token to users, cou
 	r := mux.NewRouter()
 	r.HandleFunc("/", handler)
 
-	amw := authenticationMiddleware{}
+	amw := authenticationMiddleware{tokenUsers: make(map[string]string)}
 	amw.Populate()
 
 	r.Use(amw.Middleware)
