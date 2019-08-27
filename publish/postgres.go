@@ -77,7 +77,7 @@ func (p *Postgres) Report(r record.Record, clientIp string) error {
 	}
 
 	recordId, err := p.addRecord(tx, uid, r)
-	log.Debugf("Add Record: %s, %s", recordId, err)
+	log.Debugf("Add Record: %v, %s", recordId, err)
 	if err != nil {
 		log.Errorf("Error adding record: %s", err)
 		tx.Rollback()

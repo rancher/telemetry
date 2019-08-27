@@ -1,8 +1,6 @@
 package publish
 
 import (
-	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -10,6 +8,8 @@ import (
 
 	collector "github.com/rancher/telemetry/collector"
 	record "github.com/rancher/telemetry/record"
+	log "github.com/sirupsen/logrus"
+	"github.com/urfave/cli"
 )
 
 const GA_URL = "https://www.google-analytics.com/collect"
