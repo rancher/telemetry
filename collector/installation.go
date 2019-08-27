@@ -1,9 +1,10 @@
 package collector
 
 import (
-	"github.com/satori/go.uuid"
-	log "github.com/sirupsen/logrus"
 	"regexp"
+
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
