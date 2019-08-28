@@ -54,8 +54,8 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 			projectID := parts[1]
 			cluster, err := c.Client.Cluster.ByID(clusterID)
 			if err != nil {
-				log.Errorf("Failed to get cluster %s err=%s", clusterID, err)
-				return nil
+				log.Errorf("Failed to get cluster %s for project %s err=%s", clusterID, projectID, err)
+				continue
 			}
 			nsCollection := filterNSCollectionWithProjectID(GetNamespaceCollection(c, cluster.Links["namespaces"]), projectID)
 			totalNs := len(nsCollection.Data)
