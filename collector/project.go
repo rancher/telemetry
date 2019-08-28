@@ -15,6 +15,7 @@ type Project struct {
 	Total         int          `json:"total"`
 	Ns            NsInfo       `json:"namespace"`
 	Workload      WorkloadInfo `json:"workload"`
+	HPA           HPAInfo      `json:"hpa"`
 	Pod           PodData      `json:"pod"`
 	Orchestration LabelCount   `json:"orch"`
 }
@@ -45,6 +46,7 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 	var nsUtils []float64
 	var wlUtils []float64
 	var poUtils []float64
+	var hpaUtils []float64
 
 	for _, project := range list.Data {
 		// Namespace
@@ -71,6 +73,14 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 			wlUtils = append(wlUtils, float64(totalWl))
 		}
 
+		// HPA
+		hpaCollection := GetHPACollection(c, project.Links["horizontalPodAutoscalers"])
+		if hpaCollection != nil {
+			totalHPAs := len(hpaCollection.Data)
+			p.HPA.Update(totalHPAs)
+			hpaUtils = append(hpaUtils, float64(totalHPAs))
+		}
+
 		// Pod
 		poCollection := GetPodCollection(c, project.Links["pods"])
 		if poCollection != nil {
@@ -82,6 +92,7 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 
 	p.Ns.UpdateAvg(nsUtils)
 	p.Workload.UpdateAvg(wlUtils)
+	p.HPA.UpdateAvg(hpaUtils)
 	p.Pod.UpdateAvg(poUtils)
 
 	return p
