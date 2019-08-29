@@ -2,6 +2,7 @@ package collector
 
 import (
 	"regexp"
+	"strings"
 
 	uuid "github.com/satori/go.uuid"
 	log "github.com/sirupsen/logrus"
@@ -18,6 +19,7 @@ type Installation struct {
 	Image                string     `json:"image"`
 	Version              string     `json:"version"`
 	AuthConfig           LabelCount `json:"auth"`
+	Users                LabelCount `json:"users"`
 	KontainerDriverCount int        `json:"kontainerDriverCount"`
 	KontainerDrivers     LabelCount `json:"kontainerDrivers"`
 	NodeDriverCount      int        `json:"nodeDriverCount"`
@@ -43,6 +45,7 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 	i.Image = "unknown"
 	i.Version = "unknown"
 	i.AuthConfig = make(LabelCount)
+	i.Users = make(LabelCount)
 	i.KontainerDrivers = make(LabelCount)
 	i.NodeDrivers = make(LabelCount)
 
@@ -71,6 +74,21 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 		}
 	} else {
 		log.Errorf("Failed to get authProviders err=%s", err)
+	}
+
+	log.Debug("Collecting Users")
+	userList, err := c.Client.User.List(&nonRemoved)
+	if err == nil {
+		for _, user := range userList.Data {
+			for _, principalID := range user.PrincipalIDs {
+				provider := strings.Split(principalID, "://")
+				if len(provider) > 1 {
+					i.Users.Increment(provider[0])
+				}
+			}
+		}
+	} else {
+		log.Errorf("Failed to get users err=%s", err)
 	}
 
 	log.Debug("Collecting NodeDrivers")
