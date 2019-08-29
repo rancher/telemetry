@@ -15,6 +15,7 @@ type Project struct {
 	Total         int          `json:"total"`
 	Ns            NsInfo       `json:"namespace"`
 	Workload      WorkloadInfo `json:"workload"`
+	Pipeline      PipelineInfo `json:"pipeline"`
 	HPA           HPAInfo      `json:"hpa"`
 	Pod           PodData      `json:"pod"`
 	Orchestration LabelCount   `json:"orch"`
@@ -65,12 +66,29 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 			nsUtils = append(nsUtils, float64(totalNs))
 			p.Ns.UpdateDetails(&nsCollection)
 		}
+
 		// Workload
 		wlCollection := GetWorkloadCollection(c, project.Links["workloads"])
 		if wlCollection != nil {
 			totalWl := len(wlCollection.Data)
 			p.Workload.Update(totalWl)
 			wlUtils = append(wlUtils, float64(totalWl))
+		}
+
+		// Pipeline
+		pipelineCollection := GetPipelineCollection(c, project.Links["pipelines"])
+		if pipelineCollection != nil {
+			p.Pipeline.TotalPipelines += len(pipelineCollection.Data)
+		}
+
+		// Source provider
+		p.Pipeline.SourceProvider = make(LabelCount)
+		sourceCollection := GetSourceCodeProviderCollection(c, project.Links["sourceCodeProviders"])
+		if sourceCollection != nil {
+			p.Pipeline.Enabled = 1
+			for _, provider := range sourceCollection.Data {
+				p.Pipeline.SourceProvider.Increment(provider.Type)
+			}
 		}
 
 		// HPA
