@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"fmt"
 	"strings"
 
 	rancher "github.com/rancher/types/client/cluster/v3"
@@ -16,6 +17,7 @@ type Project struct {
 	Ns            NsInfo       `json:"namespace"`
 	Workload      WorkloadInfo `json:"workload"`
 	Pipeline      PipelineInfo `json:"pipeline"`
+	LibraryCharts LabelCount   `json:"charts"`
 	HPA           HPAInfo      `json:"hpa"`
 	Pod           PodData      `json:"pod"`
 	Orchestration LabelCount   `json:"orch"`
@@ -43,6 +45,8 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 	p.Orchestration = make(LabelCount)
 	p.Orchestration[orchestrationName] = total
 	p.Total = total
+
+	p.LibraryCharts = make(LabelCount)
 
 	var nsUtils []float64
 	var wlUtils []float64
@@ -105,6 +109,35 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 			totalPo := len(poCollection.Data)
 			p.Pod.Update(totalPo)
 			poUtils = append(poUtils, float64(totalPo))
+		}
+
+		// Apps
+		defaultLibraryName := ""
+
+		catalogCollection, err := c.Client.Catalog.List(&opts)
+		if err != nil {
+			log.Error("Error listing catalogs")
+			continue
+		}
+
+		for _, catalog := range catalogCollection.Data {
+			if catalog.URL == "https://git.rancher.io/charts" {
+				defaultLibraryName = catalog.Name
+			}
+		}
+
+		appsCollection := GetAppsCollection(c, project.Links["apps"])
+		if appsCollection != nil {
+			for _, app := range appsCollection.Data {
+				if strings.Contains(app.ExternalID, fmt.Sprintf("catalog=%s&", defaultLibraryName)) {
+					chartParts := strings.Split(app.ExternalID, "template=")
+					if len(chartParts) > 1 {
+						chartParts = strings.Split(chartParts[1], "&version")
+						chart := chartParts[0]
+						p.LibraryCharts.Increment(chart)
+					}
+				}
+			}
 		}
 	}
 
