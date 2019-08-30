@@ -2,6 +2,7 @@
 /bin
 *.swp
 /.trash-cache
+/.idea
 /build
 /dist
 /telemetry
