@@ -16,6 +16,7 @@ type Cluster struct {
 	IstioTotal       int         `json:"istio"`
 	MonitoringTotal  int         `json:"monitoring"`
 	LogProviderCount LabelCount  `json:"logging"`
+	CloudProvider    LabelCount  `json:"cloudProvider"`
 }
 
 func (h Cluster) RecordKey() string {
@@ -39,6 +40,7 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 	h.Mem = &MemoryInfo{}
 	h.Pod = &PodInfo{}
 	h.Driver = make(LabelCount)
+	h.CloudProvider = make(LabelCount)
 
 	var cpuUtils []float64
 	var memUtils []float64
@@ -97,6 +99,11 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 
 		// Driver
 		h.Driver.Increment(cluster.Driver)
+
+		if cluster.RancherKubernetesEngineConfig != nil && cluster.RancherKubernetesEngineConfig.CloudProvider != nil {
+			h.CloudProvider.Increment(
+				cluster.RancherKubernetesEngineConfig.CloudProvider.Name)
+		}
 
 		// Namespace
 		nsCollection := GetNamespaceCollection(c, cluster.Links["namespaces"])
