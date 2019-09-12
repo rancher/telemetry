@@ -41,7 +41,7 @@ func GetPipelineCollection(c *CollectorOpts, url string) *rancher.PipelineCollec
 
 func GetSourceCodeProviderCollection(c *CollectorOpts, url string) *rancher.SourceCodeProviderCollection {
 	if url == "" {
-		log.Debugf("SourceCodeProvier collection link is empty.")
+		log.Debugf("SourceCodeProvider collection link is empty.")
 		return nil
 	}
 
