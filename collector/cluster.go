@@ -101,8 +101,10 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 		h.Driver.Increment(cluster.Driver)
 
 		if cluster.RancherKubernetesEngineConfig != nil && cluster.RancherKubernetesEngineConfig.CloudProvider != nil {
-			h.CloudProvider.Increment(
-				cluster.RancherKubernetesEngineConfig.CloudProvider.Name)
+			if cluster.RancherKubernetesEngineConfig.CloudProvider.Name != "" {
+				h.CloudProvider.Increment(
+					cluster.RancherKubernetesEngineConfig.CloudProvider.Name)
+			}
 		}
 
 		// Namespace
