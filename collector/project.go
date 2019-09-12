@@ -45,6 +45,7 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 
 	p.LibraryCharts = make(LabelCount)
 	p.Orchestration = make(LabelCount)
+	p.Pipeline.SourceProvider = make(LabelCount)
 	p.Orchestration[orchestrationName] = total
 	p.Total = total
 
@@ -94,7 +95,6 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 		}
 
 		// Source provider
-		p.Pipeline.SourceProvider = make(LabelCount)
 		sourceCollection := GetSourceCodeProviderCollection(c, project.Links["sourceCodeProviders"])
 		if sourceCollection != nil {
 			p.Pipeline.Enabled = 1
