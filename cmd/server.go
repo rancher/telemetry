@@ -28,13 +28,12 @@ const DEF_HOURS = 7
 const DEF_DAYS = 28
 
 var (
-	version         string
-	enableXff       bool
-	googlePublisher *publish.Google
-	dbPublisher     *publish.Postgres
-	adminUser       string
-	adminHash       string
-	authenticator   *auth.BasicAuth
+	version       string
+	enableXff     bool
+	dbPublisher   *publish.Postgres
+	adminUser     string
+	adminHash     string
+	authenticator *auth.BasicAuth
 )
 
 type RequiredOptions []string
@@ -72,13 +71,6 @@ func ServerCommand() cli.Command {
 				Name:        "xff",
 				Usage:       "enable support for X-Forwarded-For header",
 				Destination: &enableXff,
-			},
-
-			cli.StringFlag{
-				Name:   "ga-tid",
-				Usage:  "google analytics tracking id",
-				Value:  "",
-				EnvVar: "TELEMETRY_GA_TID",
 			},
 
 			cli.StringFlag{
@@ -153,7 +145,6 @@ func serverRun(c *cli.Context) error {
 	rand.Seed(time.Now().UnixNano())
 
 	version = c.App.Version
-	googlePublisher = publish.NewGoogle(c)
 	dbPublisher = publish.NewPostgres(c)
 
 	adminUser = c.String("admin-key")
@@ -341,11 +332,6 @@ func serverPublish(w http.ResponseWriter, req *http.Request) {
 	realIp := requestIp(req)
 	ip := anonymizeIp(realIp)
 	log.Debugf("Publish from %s: %s", realIp, r)
-
-	err = googlePublisher.Report(r, ip)
-	if err != nil {
-		log.Errorf("Error publishing to Google: %s", err)
-	}
 
 	dbPublisher.Report(r, ip)
 	if err != nil {
