@@ -10,13 +10,11 @@ import (
 
 const (
 	UID_SETTING            = "telemetry-uid"
-	SERVER_IMAGE_SETTING   = "server-image"
 	SERVER_VERSION_SETTING = "server-version"
 )
 
 type Installation struct {
 	Uid                  string     `json:"uid"`
-	Image                string     `json:"image"`
 	Version              string     `json:"version"`
 	AuthConfig           LabelCount `json:"auth"`
 	Users                LabelCount `json:"users"`
@@ -42,19 +40,11 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 	uid, _ = i.GetUid(uid, c)
 
 	i.Uid = uid
-	i.Image = "unknown"
 	i.Version = "unknown"
 	i.AuthConfig = make(LabelCount)
 	i.Users = make(LabelCount)
 	i.KontainerDrivers = make(LabelCount)
 	i.NodeDrivers = make(LabelCount)
-
-	if image, ok := GetSettingByCollection(settings, SERVER_IMAGE_SETTING); ok {
-		log.Debugf("  Image: %s", image)
-		if image != "" {
-			i.Image = image
-		}
-	}
 
 	if version, ok := GetSettingByCollection(settings, SERVER_VERSION_SETTING); ok {
 		log.Debugf("  Version: %s", version)
