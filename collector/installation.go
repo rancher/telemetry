@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	TELEMETRY_OPT_SETTING  = "telemetry-opt"
 	TELEMETRY_UID_SETTING  = "telemetry-uid"
 	SERVER_VERSION_SETTING = "server-version"
 )
@@ -157,6 +158,16 @@ func GetTelemetryUid(c *CollectorOpts) (string, bool) {
 
 func (i *Installation) GetUid(c *CollectorOpts) {
 	i.Uid, _ = GetTelemetryUid(c)
+}
+
+func IsTelemetryEnabled(c *CollectorOpts) bool {
+	telemetry, err := c.Client.Setting.ByID(TELEMETRY_OPT_SETTING)
+	if err != nil {
+		log.Errorf("Failed to get setting %s err=%s", TELEMETRY_OPT_SETTING, err)
+		return false
+	}
+
+	return (telemetry.Value == "in")
 }
 
 func init() {

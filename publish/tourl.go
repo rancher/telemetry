@@ -22,10 +22,10 @@ type ToUrl struct {
 	rancherVersion   string
 }
 
-func NewToUrl(c *cli.Context) *ToUrl {
+func NewToUrl(c *cli.Context, uri string) *ToUrl {
 	out := &ToUrl{
 		telemetryVersion: c.App.Version,
-		url:              c.String("to-url"),
+		url:              c.String("to-url") + uri,
 	}
 
 	if out.url == "" {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -20,19 +21,19 @@ import (
 	rancher "github.com/rancher/types/client/management/v3"
 )
 
-const (
-	RECORD_VERSION = 2
-	EXISTING_FILE  = ".existing"
-)
+const EXISTING_FILE = ".existing"
 
 var (
-	publisher *publish.ToUrl
-	url       string
-	accessKey string
-	secretKey string
-	tokenKey  string
-	caCert    string
-	target    string
+	publisher  *publish.ToUrl
+	licenser   *publish.ToUrl
+	records    map[string]record.Record
+	url        string
+	accessKey  string
+	secretKey  string
+	tokenKey   string
+	caCert     string
+	target     string
+	collecting sync.Mutex
 )
 
 func ClientCommand() cli.Command {
@@ -102,7 +103,7 @@ func ClientCommand() cli.Command {
 			cli.StringFlag{
 				Name:   "to-url",
 				Usage:  "url to send stats to",
-				Value:  "https://telemetry.rancher.io/publish",
+				Value:  "https://telemetry.rancher.io",
 				EnvVar: "TELEMETRY_TO_URL",
 			},
 		},
@@ -140,13 +141,16 @@ func clientRun(c *cli.Context) error {
 		return clientShowOnce()
 	}
 
-	publisher = publish.NewToUrl(c)
+	publisher = publish.NewToUrl(c, PUBLISH_URI)
+	licenser = publish.NewToUrl(c, LICENSE_URI)
 
 	router := mux.NewRouter()
 	router.HandleFunc("/favicon.ico", http.NotFound)
 	router.HandleFunc("/v1-telemetry", clientShow).Methods("GET")
 	router.HandleFunc("/v1-telemetry/reload", clientReload).Methods("POST")
 	router.HandleFunc("/v1-telemetry/report", clientReport).Methods("POST")
+	router.HandleFunc("/v1-license", licenseShow).Methods("GET")
+	router.HandleFunc("/v1-license/check", licenseCheck).Methods("POST")
 
 	interval := c.String("interval")
 	if interval != "" {
@@ -181,32 +185,92 @@ func clientRun(c *cli.Context) error {
 
 // CLI Handlers
 func clientShowOnce() error {
-	r, err := collect()
+	err := collect()
 	if err != nil {
 		return cli.NewExitError(err.Error(), 1)
 	}
 
-	str, err := json.MarshalIndent(r, "", "  ")
-	if err != nil {
-		return cli.NewExitError(err.Error(), 1)
-	}
+	collecting.Lock()
+	defer collecting.Unlock()
 
-	fmt.Print(string(str))
-	fmt.Print("\n")
+	for i := range records {
+		str, err := json.MarshalIndent(records[i], "", "  ")
+		if err != nil {
+			return cli.NewExitError(err.Error(), 1)
+		}
+
+		fmt.Print(string(str))
+		fmt.Print("\n")
+	}
 	return cli.NewExitError("", 0)
 }
 
 // HTTP Handlers
 func clientShow(w http.ResponseWriter, req *http.Request) {
-	r, err := collect()
-	if err == nil {
-		respondSuccess(w, req, r)
-	} else {
+	err := collect()
+	if err != nil {
 		respondError(w, req, err.Error(), 500)
+		return
 	}
+
+	collecting.Lock()
+	defer collecting.Unlock()
+
+	if records[collector.RECORD_INSTALLATION] == nil {
+		respondSuccess(w, req, "Telemetry is disabled")
+		return
+	}
+	respondSuccess(w, req, records[collector.RECORD_INSTALLATION])
+}
+
+func licenseShow(w http.ResponseWriter, req *http.Request) {
+	err := collect()
+	if err != nil {
+		respondError(w, req, err.Error(), 500)
+		return
+	}
+
+	collecting.Lock()
+	defer collecting.Unlock()
+
+	if records[collector.RECORD_LICENSING] == nil {
+		respondSuccess(w, req, "Rancher is not licensed")
+		return
+	}
+	respondSuccess(w, req, records[collector.RECORD_LICENSING])
+}
+
+func licenseCheck(w http.ResponseWriter, req *http.Request) {
+	err := collect()
+	if err != nil {
+		respondError(w, req, err.Error(), 500)
+		return
+	}
+
+	collecting.Lock()
+	defer collecting.Unlock()
+
+	if records[collector.RECORD_LICENSING] == nil {
+		respondSuccess(w, req, "No License data")
+		return
+	}
+
+	resp, err := licenser.Report(records[collector.RECORD_LICENSING], "")
+	if err != nil {
+		log.Errorf("Error licensing report: %s", err)
+		respondError(w, req, string(resp), 400)
+		return
+	}
+	w.Write(resp)
 }
 
 func clientReload(w http.ResponseWriter, req *http.Request) {
+	err := collect()
+	if err != nil {
+		log.Errorf("Error collecting data: %s", err)
+		respondError(w, req, "Error reloading data", 400)
+		return
+	}
 	w.Write([]byte("ok"))
 }
 
@@ -219,7 +283,7 @@ func report() {
 	start := time.Now()
 	log.Debug("Starting report")
 
-	r, err := collect()
+	err := collect()
 	if err != nil {
 		log.Errorf("Error collecting data: %s", err)
 		return
@@ -227,43 +291,57 @@ func report() {
 	diff := time.Now().Sub(start).String()
 	log.Debugf("Collected stats in %s", diff)
 
-	err = publisher.Report(r, "")
-	if err != nil {
-		log.Errorf("Error publishing report: %s", err)
-		return
+	collecting.Lock()
+	defer collecting.Unlock()
+
+	if records[collector.RECORD_INSTALLATION] != nil {
+		_, err = publisher.Report(records[collector.RECORD_INSTALLATION], "")
+		if err != nil {
+			log.Errorf("Error publishing report: %s", err)
+			return
+		}
+		diff = time.Now().Sub(start).String()
+		log.Debugf("Published telemetry in %s", diff)
+	}
+
+	if records[collector.RECORD_LICENSING] != nil {
+		_, err = licenser.Report(records[collector.RECORD_LICENSING], "")
+		if err != nil {
+			log.Errorf("Error licensing report: %s", err)
+			return
+		}
+		diff = time.Now().Sub(start).String()
+		log.Debugf("Published licensing in %s", diff)
 	}
 
 	diff = time.Now().Sub(start).String()
 	log.Debugf("Completed report in %s", diff)
 }
 
-func collect() (record.Record, error) {
-	log.Infof("Collecting anonymous data from %s", url)
+func collect() error {
 	client, err := rancher.NewClient(&clientbase.ClientOpts{
 		URL:      url,
 		TokenKey: tokenKey,
 		Insecure: true,
 	})
-
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	r := record.Record{}
-	r["r"] = RECORD_VERSION
-	r["ts"] = time.Now().UTC().Format(time.RFC3339)
 
 	opt := collector.CollectorOpts{
 		Client: client,
 	}
 
-	collector.Run(&r, &opt)
+	collecting.Lock()
+	defer collecting.Unlock()
 
-	return r, nil
+	records = collector.Run(&opt)
+
+	return nil
 }
 
 func isExisting() bool {
-	want := strconv.Itoa(RECORD_VERSION)
+	want := strconv.Itoa(collector.RECORD_VERSION)
 	have := ""
 
 	data, err := ioutil.ReadFile(EXISTING_FILE)
