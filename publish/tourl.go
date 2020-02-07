@@ -35,32 +35,32 @@ func NewToUrl(c *cli.Context, uri string) *ToUrl {
 	return out
 }
 
-func (p *ToUrl) Report(r record.Record, clientIp string) error {
+func (p *ToUrl) Report(r record.Record, clientIp string) ([]byte, error) {
 	if p.url == "" {
-		return nil
+		return nil, nil
 	}
 
 	b, err := json.Marshal(r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	res, err := http.Post(p.url, "application/json", bytes.NewBuffer(b))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if res.StatusCode >= 200 && res.StatusCode <= 299 {
 		log.Debugf(fmt.Sprintf("Server said %d: %s", res.StatusCode, body))
-		return nil
+		return body, nil
 	} else {
 		log.Errorf(fmt.Sprintf("Server said %d: %s", res.StatusCode, body))
-		return errors.New(fmt.Sprintf("Server returned %d", res.StatusCode))
+		return nil, errors.New(fmt.Sprintf("Server returned %d", res.StatusCode))
 	}
 }

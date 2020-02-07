@@ -99,13 +99,71 @@ func (p *Postgres) Report(r record.Record, clientIp string) error {
 
 	err = tx.Commit()
 	if err != nil {
-		log.Errorf("Error commiting transatcion: %s", err)
+		log.Errorf("Error commiting transaction: %s", err)
 		tx.Rollback()
 		return err
 	}
 
 	log.Debugf("Published to Postgres")
 	return nil
+}
+
+func (p *Postgres) LicenseInstallation(r record.Record, clientIp string) (*License, error) {
+	log.Debugf("Licensing Installation to Postgres")
+
+	license, ok := r["license"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("  Error getting license installation data")
+	}
+	licenseKey, ok := license["key"].(string)
+	if !ok {
+		return nil, fmt.Errorf("  Error getting license installation key")
+	}
+	installUid, ok := license["installationUid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("  Error getting license installation installationUid")
+	}
+	telemetryUid, ok := license["telemetryUid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("  Error getting license installation telemetryUid")
+	}
+	nodes, ok := license["runningNodes"].(float64)
+	if !ok {
+		return nil, fmt.Errorf("  Error getting license installation runningNodes")
+	}
+	runningNodes := int(nodes)
+
+	tx, err := p.Conn.Begin()
+	if err != nil {
+		log.Errorf("  Error creating transaction: %s", err)
+		tx.Rollback()
+		return nil, err
+	}
+
+	recordId, err := p.addLicenseIntallationRecord(tx, installUid, licenseKey, telemetryUid, r)
+	log.Debugf("  Add License Installation Record: %v, %s", recordId, err)
+	if err != nil {
+		log.Errorf("    Error adding license installation record: %s", err)
+		tx.Rollback()
+		return nil, err
+	}
+
+	recordId, err = p.upsertLicenseInstallation(tx, installUid, licenseKey, telemetryUid, clientIp, runningNodes, recordId)
+	log.Debugf("  Update License Installation: %v, %s", recordId, err)
+	if err != nil {
+		log.Errorf("    Error updating license installation: %s", err)
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Errorf("  Error commiting transaction: %s", err)
+		tx.Rollback()
+		return nil, err
+	}
+
+	log.Debugf("Licensed Installation to Postgres")
+	return p.GetLicenseByKey(licenseKey)
 }
 
 func (p *Postgres) testDb() error {
@@ -134,6 +192,36 @@ func (p *Postgres) addRecord(tx *sql.Tx, uid string, r record.Record) (int, erro
 	return id, err
 }
 
+func (p *Postgres) addLicenseIntallationRecord(tx *sql.Tx, uid, licenseKey, telemetryUid string, r record.Record) (int, error) {
+	var id int
+
+	b, err := json.Marshal(r)
+	if err != nil {
+		return 0, err
+	}
+
+	err = tx.QueryRow(`
+		INSERT INTO license_installation_record(uid,license_key,telemetry_uid,data,ts) 
+		VALUES ($1,$2,$3,$4,NOW())
+		RETURNING id`, uid, licenseKey, telemetryUid, string(b)).Scan(&id)
+	return id, err
+}
+
+func (p *Postgres) addLicenseRecord(tx *sql.Tx, key string, r record.Record) (int, error) {
+	var id int
+
+	b, err := json.Marshal(r)
+	if err != nil {
+		return 0, err
+	}
+
+	err = tx.QueryRow(`
+		INSERT INTO license_record(key,data,ts) 
+		VALUES ($1,$2,NOW())
+		RETURNING id`, key, string(b)).Scan(&id)
+	return id, err
+}
+
 func (p *Postgres) upsertInstall(tx *sql.Tx, uid string, clientIp string, recordId int) (int, error) {
 	var id int
 
@@ -145,6 +233,39 @@ func (p *Postgres) upsertInstall(tx *sql.Tx, uid string, clientIp string, record
 			last_ip=$2,
 			last_record=$3
 		RETURNING id`, uid, clientIp, recordId).Scan(&id)
+	return id, err
+}
+
+func (p *Postgres) upsertLicenseInstallation(tx *sql.Tx, uid, licenseKey, telemetryUid, clientIp string, runningNodes, recordId int) (int, error) {
+	var id int
+
+	err := tx.QueryRow(`
+		INSERT INTO license_installation(uid,license_key,telemetry_uid,last_ip,running_nodes,last_record,first_seen,last_seen) 
+		VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())
+		ON CONFLICT(uid) DO UPDATE SET
+			last_seen=NOW(),
+			license_key=$2,
+			telemetry_uid=$3,
+			last_ip=$4,
+			running_nodes=$5,
+			last_record=$6
+		RETURNING id`, uid, licenseKey, telemetryUid, clientIp, runningNodes, recordId).Scan(&id)
+	return id, err
+}
+
+func (p *Postgres) upsertLicense(tx *sql.Tx, key, clientIp string, lInstallations, lNodes, recordId int) (int, error) {
+	var id int
+
+	err := tx.QueryRow(`
+		INSERT INTO license(key,last_ip,licensed_installations,licensed_nodes,last_record,first_seen,last_seen) 
+		VALUES ($1,$2,$3,$4,$5,NOW(),NOW())
+		ON CONFLICT(uid) DO UPDATE SET
+			last_seen=NOW(),
+			last_ip=$2,
+			licensed_installations=$3,
+			licensed_nodes=$4,
+			last_record=$5
+		RETURNING id`, key, clientIp, lInstallations, lNodes, recordId).Scan(&id)
 	return id, err
 }
 

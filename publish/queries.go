@@ -27,6 +27,23 @@ type ApiRecord struct {
 	Record interface{} `json:"record"`
 }
 
+type LicenseIntallation struct {
+	Uid          string `json:"uid"`
+	TelemetryUID string `json:"telemetryUid"`
+	RunningNodes int    `json:"runningNodes"`
+	LastIp       string `json:"lastIp"`
+}
+
+type License struct {
+	Key                  string               `json:"key"`
+	Intallations         []LicenseIntallation `json:"installations"`
+	LicensedIntallations int                  `json:"licensedIntallations"`
+	LicensedNodes        int                  `json:"licensedNodes"`
+	RunningIntallations  int                  `json:"runningIntallations"`
+	RunningNodes         int                  `json:"runningNodes"`
+	Compliant            bool                 `json:"compliant"`
+}
+
 type RecordsByUid map[string]ApiRecord
 type RecordsByDateByUid map[string]RecordsByUid
 
@@ -65,6 +82,63 @@ func (p *Postgres) GetAllInstalls() ([]ApiInstallation, error) {
 	}
 
 	return out, nil
+}
+
+func (p *Postgres) GetLicenseByKey(key string) (*License, error) {
+	sql := `SELECT licensed_installations,licensed_nodes FROM license WHERE key = $1`
+
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql, key)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := &License{Key: key}
+
+	rows.Next()
+	err = rows.Scan(&out.LicensedIntallations, &out.LicensedNodes)
+	if err != nil {
+		return nil, err
+	}
+
+	out.RunningNodes, out.Intallations, err = p.GetLicenseInstallationByLicenseKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	out.RunningIntallations = len(out.Intallations)
+	out.Compliant = (out.LicensedNodes >= out.RunningNodes) && (out.LicensedIntallations >= out.RunningIntallations)
+
+	return out, nil
+}
+
+func (p *Postgres) GetLicenseInstallationByLicenseKey(licenseKey string) (int, []LicenseIntallation, error) {
+	sql := `SELECT uid, telemetry_uid, last_ip, running_nodes FROM license_installation WHERE license_key = $1`
+
+	log.Debugf("Query: %s", sql)
+	rows, err := p.Conn.Query(sql, licenseKey)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+
+	out := []LicenseIntallation{}
+	totalRunningNodes := 0
+	for rows.Next() {
+		var i LicenseIntallation
+
+		err = rows.Scan(&i.Uid, &i.TelemetryUID, &i.LastIp, &i.RunningNodes)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		totalRunningNodes += i.RunningNodes
+
+		out = append(out, i)
+	}
+
+	return totalRunningNodes, out, nil
 }
 
 func (p *Postgres) GetActiveInstalls(hours int) ([]ApiInstallation, error) {
