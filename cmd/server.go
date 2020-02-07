@@ -24,8 +24,12 @@ import (
 	record "github.com/rancher/telemetry/record"
 )
 
-const DEF_HOURS = 7
-const DEF_DAYS = 28
+const (
+	DEF_HOURS   = 7
+	DEF_DAYS    = 28
+	PUBLISH_URI = "/publish"
+	LICENSE_URI = "/licensing"
+)
 
 var (
 	version       string
@@ -157,7 +161,8 @@ func serverRun(c *cli.Context) error {
 	router := mux.NewRouter()
 	router.HandleFunc("/favicon.ico", http.NotFound)
 	router.HandleFunc("/healthcheck.html", serverCheck).Methods("GET")
-	router.HandleFunc("/publish", serverPublish).Methods("POST")
+	router.HandleFunc(PUBLISH_URI, serverPublish).Methods("POST")
+	router.HandleFunc(LICENSE_URI, serverLicenseInstallation).Methods("POST")
 	router.HandleFunc("/", serverRoot).Methods("GET")
 
 	// Admin
@@ -333,12 +338,38 @@ func serverPublish(w http.ResponseWriter, req *http.Request) {
 	ip := anonymizeIp(realIp)
 	log.Debugf("Publish from %s: %s", realIp, r)
 
-	dbPublisher.Report(r, ip)
+	err = dbPublisher.Report(r, ip)
 	if err != nil {
 		log.Errorf("Error publishing to DB: %s", err)
+		respondError(w, req, "Error publishing to DB", 400)
+		return
 	}
 
 	respondSuccess(w, req, map[string]string{"ok": "1"})
+}
+
+func serverLicenseInstallation(w http.ResponseWriter, req *http.Request) {
+	var r record.Record
+
+	decoder := json.NewDecoder(req.Body)
+	err := decoder.Decode(&r)
+	if err != nil {
+		respondError(w, req, "Error parsing Record", 400)
+		return
+	}
+
+	realIp := requestIp(req)
+	ip := anonymizeIp(realIp)
+	log.Debugf("Publish from %s: %s", realIp, r)
+
+	license, err := dbPublisher.LicenseInstallation(r, ip)
+	if err != nil {
+		log.Errorf("Error publishing to DB: %s", err)
+		respondError(w, req, "Error publishing to DB", 400)
+		return
+	}
+
+	respondSuccess(w, req, license)
 }
 
 // ------------
