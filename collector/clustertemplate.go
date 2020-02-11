@@ -17,14 +17,14 @@ func (ct ClusterTemplate) RecordKey() string {
 func (ct ClusterTemplate) Collect(c *CollectorOpts) interface{} {
 	nonRemoved := NonRemoved()
 
-	clusterTemplateList, err := c.Client.ClusterTemplate.List(&nonRemoved)
+	clusterTemplateList, err := c.Client.ClusterTemplate.ListAll(&nonRemoved)
 	if err != nil {
 		log.Errorf("Failed to get Clusters Templates err=%s", err)
 		return nil
 	}
 	ct.TotalClusterTemplates = len(clusterTemplateList.Data)
 
-	revisionsList, err := c.Client.ClusterTemplateRevision.List(&nonRemoved)
+	revisionsList, err := c.Client.ClusterTemplateRevision.ListAll(&nonRemoved)
 	if err != nil {
 		log.Errorf("Failed to get Cluster Revisions err=%s", err)
 		return nil

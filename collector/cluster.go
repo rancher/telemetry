@@ -27,7 +27,7 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 	nonRemoved := NonRemoved()
 
 	log.Debug("Collecting Clusters")
-	clusterList, err := c.Client.Cluster.List(&nonRemoved)
+	clusterList, err := c.Client.Cluster.ListAll(&nonRemoved)
 	if err != nil {
 		log.Errorf("Failed to get Clusters err=%s", err)
 		return nil
@@ -60,7 +60,7 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 		}
 
 		allocatable := cluster.Allocatable
-		totalCores := GetRawInt(allocatable["cpu"], "")
+		totalCores := GetCPU(allocatable["cpu"])
 		totalMemMb := GetMemMb(allocatable["memory"])
 		totalPods := GetRawInt(allocatable["pods"], "")
 		if totalCores == 0 || totalMemMb == 0 || totalPods == 0 {
@@ -108,12 +108,18 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 		}
 
 		// Namespace
-		nsCollection := GetNamespaceCollection(c, cluster.Links["namespaces"])
-		if nsCollection != nil {
+		clusterClient, err := GetClusterClient(c, cluster.ID)
+		if err != nil {
+			log.Errorf("Failed to get Cluster client err=%s", err)
+		}
+		nsCollection, err := clusterClient.Namespace.ListAll(nil)
+		if err != nil {
+			log.Errorf("Failed to get Namespaces err=%s", err)
+		} else {
 			totalNs := len(nsCollection.Data)
 			h.Ns.Update(totalNs)
 			nsUtils = append(nsUtils, float64(totalNs))
-			h.Ns.UpdateDetails(nsCollection)
+			h.Ns.UpdateDetails(nsCollection.Data)
 		}
 
 		// Monitoring
@@ -135,7 +141,7 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 	// Cluster Logging
 	h.LogProviderCount = make(LabelCount)
 
-	logList, err := c.Client.ClusterLogging.List(nil)
+	logList, err := c.Client.ClusterLogging.ListAll(nil)
 	if err != nil {
 		log.Errorf("Failed to get Cluster Loggings err=%s", err)
 		return nil

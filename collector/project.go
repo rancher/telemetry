@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"strings"
 
-	rancher "github.com/rancher/types/client/cluster/v3"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -32,8 +31,10 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 	opts := NonRemoved()
 	opts.Filters["all"] = "true"
 
+	nonRemoved := NonRemoved()
+
 	log.Debug("Collecting Projects")
-	list, err := c.Client.Project.List(&opts)
+	list, err := c.Client.Project.ListAll(&opts)
 
 	if err != nil {
 		log.Errorf("Failed to get Projects err=%s", err)
@@ -63,68 +64,102 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 	}
 
 	for _, project := range list.Data {
-		// Namespace
 		parts := strings.SplitN(project.ID, ":", 2)
-		if len(parts) == 2 {
-			clusterID := parts[0]
-			projectID := parts[1]
-			cluster, err := c.Client.Cluster.ByID(clusterID)
+		clusterID := parts[0]
+		clusterClient, err := GetClusterClient(c, clusterID)
+		if err != nil {
+			log.Errorf("Failed to get cluster client ID %s err=%s", clusterID, err)
+		} else {
+			// Namespace
+			log.Debugf("  Collecting namespaces")
+			nsFilter := NonRemoved()
+			nsFilter.Filters["projectId"] = project.ID
+			nsCollection, err := clusterClient.Namespace.ListAll(&nsFilter)
 			if err != nil {
-				log.Errorf("Failed to get cluster %s for project %s err=%s", clusterID, projectID, err)
-				continue
+				log.Errorf("Failed to get Namespaces for project %s err=%s", project.ID, err)
+			} else {
+				totalNs := len(nsCollection.Data)
+				p.Ns.Update(totalNs)
+				nsUtils = append(nsUtils, float64(totalNs))
+				p.Ns.UpdateDetails(nsCollection.Data)
+				log.Debugf("    Found %d namespaces", totalNs)
 			}
-			nsCollection := filterNSCollectionWithProjectID(GetNamespaceCollection(c, cluster.Links["namespaces"]), projectID)
-			totalNs := len(nsCollection.Data)
-			p.Ns.Update(totalNs)
-			nsUtils = append(nsUtils, float64(totalNs))
-			p.Ns.UpdateDetails(&nsCollection)
+		}
+
+		projectClient, err := GetProjectClient(c, project.ID)
+		if err != nil {
+			log.Errorf("Failed to get project client ID %s err=%s", project.ID, err)
+			continue
 		}
 
 		// Workload
-		wlCollection := GetWorkloadCollection(c, project.Links["workloads"])
-		if wlCollection != nil {
+		log.Debugf("  Collecting Workloads")
+		wlCollection, err := projectClient.Workload.ListAll(&nonRemoved)
+		if err != nil {
+			log.Errorf("Failed to get Workload for project %s err=%s", project.ID, err)
+		} else {
 			totalWl := len(wlCollection.Data)
 			p.Workload.Update(totalWl)
 			wlUtils = append(wlUtils, float64(totalWl))
+			log.Debugf("    Found %d Workloads", totalWl)
 		}
 
 		// Pipeline
-		pipelineCollection := GetPipelineCollection(c, project.Links["pipelines"])
-		if pipelineCollection != nil {
+		log.Debugf("  Collecting Pipelines")
+		pipelineCollection, err := projectClient.Pipeline.ListAll(&nonRemoved)
+		if err != nil {
+			log.Errorf("Failed to get Pipelines for project %s err=%s", project.ID, err)
+		} else {
 			p.Pipeline.TotalPipelines += len(pipelineCollection.Data)
+			log.Debugf("    Found %d Pipelines", p.Pipeline.TotalPipelines)
 		}
 
 		// Source provider
-		sourceCollection := GetSourceCodeProviderCollection(c, project.Links["sourceCodeProviders"])
-		if sourceCollection != nil {
+		log.Debugf("  Collecting SourceCodeProviders")
+		sourceCollection, err := projectClient.SourceCodeProvider.ListAll(&nonRemoved)
+		if err != nil {
+			log.Errorf("Failed to get SourceCodeProvider for project %s err=%s", project.ID, err)
+		} else {
 			p.Pipeline.Enabled = 1
 			for _, provider := range sourceCollection.Data {
 				p.Pipeline.SourceProvider.Increment(provider.Type)
 			}
+			log.Debugf("    Found %d SourceCodeProviders", len(sourceCollection.Data))
 		}
 
 		// HPA
-		hpaCollection := GetHPACollection(c, project.Links["horizontalPodAutoscalers"])
-		if hpaCollection != nil {
+		log.Debugf("  Collecting HPAs")
+		hpaCollection, err := projectClient.HorizontalPodAutoscaler.ListAll(&nonRemoved)
+		if err != nil {
+			log.Errorf("Failed to get HPA for project %s err=%s", project.ID, err)
+		} else {
 			totalHPAs := len(hpaCollection.Data)
 			p.HPA.Update(totalHPAs)
 			hpaUtils = append(hpaUtils, float64(totalHPAs))
+			log.Debugf("    Found %d HPAs", totalHPAs)
 		}
 
 		// Pod
-		poCollection := GetPodCollection(c, project.Links["pods"])
-		if poCollection != nil {
+		log.Debugf("  Collecting Pods")
+		poCollection, err := projectClient.Pod.ListAll(&nonRemoved)
+		if err != nil {
+			log.Errorf("Failed to get Pod for project %s err=%s", project.ID, err)
+		} else {
 			totalPo := len(poCollection.Data)
 			p.Pod.Update(totalPo)
 			poUtils = append(poUtils, float64(totalPo))
+			log.Debugf("    Found %d Pods", totalPo)
 		}
 
 		// Apps
 		if len(parts) == 2 {
 			clusterID := parts[0]
 			if rancherCatalog != nil {
-				appsCollection := GetAppsCollection(c, project.Links["apps"])
-				if appsCollection != nil {
+				log.Debugf("  Collecting Apps")
+				appsCollection, err := projectClient.App.ListAll(&nonRemoved)
+				if err != nil {
+					log.Errorf("Failed to get Apps for project %s err=%s", project.ID, err)
+				} else {
 					for _, app := range appsCollection.Data {
 						catalog, catalogType, template, err := SplitExternalID(app.ExternalID)
 						if err != nil {
@@ -139,6 +174,7 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 							}
 						}
 					}
+					log.Debugf("    Found %d Apps", len(appsCollection.Data))
 				}
 			}
 		}
@@ -150,21 +186,6 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 	p.Pod.UpdateAvg(poUtils)
 
 	return p
-}
-
-func filterNSCollectionWithProjectID(collection *rancher.NamespaceCollection, projectID string) rancher.NamespaceCollection {
-	result := rancher.NamespaceCollection{
-		Data: []rancher.Namespace{},
-	}
-	if collection == nil {
-		return result
-	}
-	for _, ns := range collection.Data {
-		if ns.Labels[projectLabel] == projectID {
-			result.Data = append(result.Data, ns)
-		}
-	}
-	return result
 }
 
 func SplitExternalID(externalID string) (string, string, string, error) {

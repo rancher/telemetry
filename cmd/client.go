@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -19,6 +20,11 @@ import (
 	rancher "github.com/rancher/types/client/management/v3"
 )
 
+const (
+	RECORD_VERSION = 2
+	EXISTING_FILE  = ".existing"
+)
+
 var (
 	publisher *publish.ToUrl
 	url       string
@@ -28,9 +34,6 @@ var (
 	caCert    string
 	target    string
 )
-
-const RECORD_VERSION = 2
-const EXISTING_FILE = ".existing"
 
 func ClientCommand() cli.Command {
 	return cli.Command{
@@ -111,6 +114,12 @@ func clientRun(c *cli.Context) error {
 
 	if url == "" || (tokenKey == "" && (accessKey == "" || secretKey == "")) {
 		return cli.NewExitError("URL, Access Key and Secret Key OR Token Key are required", 1)
+	}
+
+	url = normalizeURL(url)
+
+	if tokenKey == "" {
+		tokenKey = accessKey + ":" + secretKey
 	}
 
 	clientVersion := c.String("version")
@@ -229,6 +238,7 @@ func report() {
 }
 
 func collect() (record.Record, error) {
+	log.Infof("Collecting anonymous data from %s", url)
 	client, err := rancher.NewClient(&clientbase.ClientOpts{
 		URL:      url,
 		TokenKey: tokenKey,
@@ -267,4 +277,18 @@ func isExisting() bool {
 		ioutil.WriteFile(EXISTING_FILE, []byte(want), 0644)
 		return false
 	}
+}
+
+func normalizeURL(url string) string {
+	if url == "" {
+		return ""
+	}
+
+	url = strings.TrimSuffix(url, "/")
+
+	if !strings.HasSuffix(url, "/v3") {
+		url = url + "/v3"
+	}
+
+	return url
 }
