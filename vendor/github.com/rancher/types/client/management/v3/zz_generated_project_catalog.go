@@ -68,15 +68,16 @@ type ProjectCatalogClient struct {
 
 type ProjectCatalogOperations interface {
 	List(opts *types.ListOpts) (*ProjectCatalogCollection, error)
+	ListAll(opts *types.ListOpts) (*ProjectCatalogCollection, error)
 	Create(opts *ProjectCatalog) (*ProjectCatalog, error)
 	Update(existing *ProjectCatalog, updates interface{}) (*ProjectCatalog, error)
 	Replace(existing *ProjectCatalog) (*ProjectCatalog, error)
 	ByID(id string) (*ProjectCatalog, error)
 	Delete(container *ProjectCatalog) error
 
-	ActionRefresh(resource *ProjectCatalog) error
+	ActionRefresh(resource *ProjectCatalog) (*CatalogRefresh, error)
 
-	CollectionActionRefresh(resource *ProjectCatalogCollection) error
+	CollectionActionRefresh(resource *ProjectCatalogCollection) (*CatalogRefresh, error)
 }
 
 func newProjectCatalogClient(apiClient *Client) *ProjectCatalogClient {
@@ -110,6 +111,24 @@ func (c *ProjectCatalogClient) List(opts *types.ListOpts) (*ProjectCatalogCollec
 	return resp, err
 }
 
+func (c *ProjectCatalogClient) ListAll(opts *types.ListOpts) (*ProjectCatalogCollection, error) {
+	resp := &ProjectCatalogCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
+	return resp, err
+}
+
 func (cc *ProjectCatalogCollection) Next() (*ProjectCatalogCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
 		resp := &ProjectCatalogCollection{}
@@ -130,12 +149,14 @@ func (c *ProjectCatalogClient) Delete(container *ProjectCatalog) error {
 	return c.apiClient.Ops.DoResourceDelete(ProjectCatalogType, &container.Resource)
 }
 
-func (c *ProjectCatalogClient) ActionRefresh(resource *ProjectCatalog) error {
-	err := c.apiClient.Ops.DoAction(ProjectCatalogType, "refresh", &resource.Resource, nil, nil)
-	return err
+func (c *ProjectCatalogClient) ActionRefresh(resource *ProjectCatalog) (*CatalogRefresh, error) {
+	resp := &CatalogRefresh{}
+	err := c.apiClient.Ops.DoAction(ProjectCatalogType, "refresh", &resource.Resource, nil, resp)
+	return resp, err
 }
 
-func (c *ProjectCatalogClient) CollectionActionRefresh(resource *ProjectCatalogCollection) error {
-	err := c.apiClient.Ops.DoCollectionAction(ProjectCatalogType, "refresh", &resource.Collection, nil, nil)
-	return err
+func (c *ProjectCatalogClient) CollectionActionRefresh(resource *ProjectCatalogCollection) (*CatalogRefresh, error) {
+	resp := &CatalogRefresh{}
+	err := c.apiClient.Ops.DoCollectionAction(ProjectCatalogType, "refresh", &resource.Collection, nil, resp)
+	return resp, err
 }

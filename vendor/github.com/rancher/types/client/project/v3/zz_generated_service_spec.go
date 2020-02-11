@@ -7,6 +7,7 @@ const (
 	ServiceSpecFieldExternalTrafficPolicy    = "externalTrafficPolicy"
 	ServiceSpecFieldHealthCheckNodePort      = "healthCheckNodePort"
 	ServiceSpecFieldHostname                 = "hostname"
+	ServiceSpecFieldIPFamily                 = "ipFamily"
 	ServiceSpecFieldLoadBalancerIP           = "loadBalancerIP"
 	ServiceSpecFieldLoadBalancerSourceRanges = "loadBalancerSourceRanges"
 	ServiceSpecFieldPorts                    = "ports"
@@ -15,6 +16,7 @@ const (
 	ServiceSpecFieldServiceKind              = "serviceKind"
 	ServiceSpecFieldSessionAffinity          = "sessionAffinity"
 	ServiceSpecFieldSessionAffinityConfig    = "sessionAffinityConfig"
+	ServiceSpecFieldTopologyKeys             = "topologyKeys"
 )
 
 type ServiceSpec struct {
@@ -23,6 +25,7 @@ type ServiceSpec struct {
 	ExternalTrafficPolicy    string                 `json:"externalTrafficPolicy,omitempty" yaml:"externalTrafficPolicy,omitempty"`
 	HealthCheckNodePort      int64                  `json:"healthCheckNodePort,omitempty" yaml:"healthCheckNodePort,omitempty"`
 	Hostname                 string                 `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	IPFamily                 string                 `json:"ipFamily,omitempty" yaml:"ipFamily,omitempty"`
 	LoadBalancerIP           string                 `json:"loadBalancerIP,omitempty" yaml:"loadBalancerIP,omitempty"`
 	LoadBalancerSourceRanges []string               `json:"loadBalancerSourceRanges,omitempty" yaml:"loadBalancerSourceRanges,omitempty"`
 	Ports                    []ServicePort          `json:"ports,omitempty" yaml:"ports,omitempty"`
@@ -31,4 +34,5 @@ type ServiceSpec struct {
 	ServiceKind              string                 `json:"serviceKind,omitempty" yaml:"serviceKind,omitempty"`
 	SessionAffinity          string                 `json:"sessionAffinity,omitempty" yaml:"sessionAffinity,omitempty"`
 	SessionAffinityConfig    *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" yaml:"sessionAffinityConfig,omitempty"`
+	TopologyKeys             []string               `json:"topologyKeys,omitempty" yaml:"topologyKeys,omitempty"`
 }

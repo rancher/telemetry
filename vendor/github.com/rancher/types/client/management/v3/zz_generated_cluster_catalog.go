@@ -68,15 +68,16 @@ type ClusterCatalogClient struct {
 
 type ClusterCatalogOperations interface {
 	List(opts *types.ListOpts) (*ClusterCatalogCollection, error)
+	ListAll(opts *types.ListOpts) (*ClusterCatalogCollection, error)
 	Create(opts *ClusterCatalog) (*ClusterCatalog, error)
 	Update(existing *ClusterCatalog, updates interface{}) (*ClusterCatalog, error)
 	Replace(existing *ClusterCatalog) (*ClusterCatalog, error)
 	ByID(id string) (*ClusterCatalog, error)
 	Delete(container *ClusterCatalog) error
 
-	ActionRefresh(resource *ClusterCatalog) error
+	ActionRefresh(resource *ClusterCatalog) (*CatalogRefresh, error)
 
-	CollectionActionRefresh(resource *ClusterCatalogCollection) error
+	CollectionActionRefresh(resource *ClusterCatalogCollection) (*CatalogRefresh, error)
 }
 
 func newClusterCatalogClient(apiClient *Client) *ClusterCatalogClient {
@@ -110,6 +111,24 @@ func (c *ClusterCatalogClient) List(opts *types.ListOpts) (*ClusterCatalogCollec
 	return resp, err
 }
 
+func (c *ClusterCatalogClient) ListAll(opts *types.ListOpts) (*ClusterCatalogCollection, error) {
+	resp := &ClusterCatalogCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
+	return resp, err
+}
+
 func (cc *ClusterCatalogCollection) Next() (*ClusterCatalogCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
 		resp := &ClusterCatalogCollection{}
@@ -130,12 +149,14 @@ func (c *ClusterCatalogClient) Delete(container *ClusterCatalog) error {
 	return c.apiClient.Ops.DoResourceDelete(ClusterCatalogType, &container.Resource)
 }
 
-func (c *ClusterCatalogClient) ActionRefresh(resource *ClusterCatalog) error {
-	err := c.apiClient.Ops.DoAction(ClusterCatalogType, "refresh", &resource.Resource, nil, nil)
-	return err
+func (c *ClusterCatalogClient) ActionRefresh(resource *ClusterCatalog) (*CatalogRefresh, error) {
+	resp := &CatalogRefresh{}
+	err := c.apiClient.Ops.DoAction(ClusterCatalogType, "refresh", &resource.Resource, nil, resp)
+	return resp, err
 }
 
-func (c *ClusterCatalogClient) CollectionActionRefresh(resource *ClusterCatalogCollection) error {
-	err := c.apiClient.Ops.DoCollectionAction(ClusterCatalogType, "refresh", &resource.Collection, nil, nil)
-	return err
+func (c *ClusterCatalogClient) CollectionActionRefresh(resource *ClusterCatalogCollection) (*CatalogRefresh, error) {
+	resp := &CatalogRefresh{}
+	err := c.apiClient.Ops.DoCollectionAction(ClusterCatalogType, "refresh", &resource.Collection, nil, resp)
+	return resp, err
 }

@@ -18,6 +18,7 @@ const (
 	NotifierFieldPagerdutyConfig      = "pagerdutyConfig"
 	NotifierFieldRemoved              = "removed"
 	NotifierFieldSMTPConfig           = "smtpConfig"
+	NotifierFieldSendResolved         = "sendResolved"
 	NotifierFieldSlackConfig          = "slackConfig"
 	NotifierFieldState                = "state"
 	NotifierFieldStatus               = "status"
@@ -42,6 +43,7 @@ type Notifier struct {
 	PagerdutyConfig      *PagerdutyConfig  `json:"pagerdutyConfig,omitempty" yaml:"pagerdutyConfig,omitempty"`
 	Removed              string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	SMTPConfig           *SMTPConfig       `json:"smtpConfig,omitempty" yaml:"smtpConfig,omitempty"`
+	SendResolved         bool              `json:"sendResolved,omitempty" yaml:"sendResolved,omitempty"`
 	SlackConfig          *SlackConfig      `json:"slackConfig,omitempty" yaml:"slackConfig,omitempty"`
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
 	Status               *NotifierStatus   `json:"status,omitempty" yaml:"status,omitempty"`
@@ -64,6 +66,7 @@ type NotifierClient struct {
 
 type NotifierOperations interface {
 	List(opts *types.ListOpts) (*NotifierCollection, error)
+	ListAll(opts *types.ListOpts) (*NotifierCollection, error)
 	Create(opts *Notifier) (*Notifier, error)
 	Update(existing *Notifier, updates interface{}) (*Notifier, error)
 	Replace(existing *Notifier) (*Notifier, error)
@@ -103,6 +106,24 @@ func (c *NotifierClient) List(opts *types.ListOpts) (*NotifierCollection, error)
 	resp := &NotifierCollection{}
 	err := c.apiClient.Ops.DoList(NotifierType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *NotifierClient) ListAll(opts *types.ListOpts) (*NotifierCollection, error) {
+	resp := &NotifierCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

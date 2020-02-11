@@ -33,6 +33,7 @@ const (
 	NodeFieldNodeTemplateID       = "nodeTemplateId"
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
+	NodeFieldPodCidrs             = "podCidrs"
 	NodeFieldProviderId           = "providerId"
 	NodeFieldPublicEndpoints      = "publicEndpoints"
 	NodeFieldRemoved              = "removed"
@@ -79,6 +80,7 @@ type Node struct {
 	NodeTemplateID       string                    `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
+	PodCidrs             []string                  `json:"podCidrs,omitempty" yaml:"podCidrs,omitempty"`
 	ProviderId           string                    `json:"providerId,omitempty" yaml:"providerId,omitempty"`
 	PublicEndpoints      []PublicEndpoint          `json:"publicEndpoints,omitempty" yaml:"publicEndpoints,omitempty"`
 	Removed              string                    `json:"removed,omitempty" yaml:"removed,omitempty"`
@@ -108,6 +110,7 @@ type NodeClient struct {
 
 type NodeOperations interface {
 	List(opts *types.ListOpts) (*NodeCollection, error)
+	ListAll(opts *types.ListOpts) (*NodeCollection, error)
 	Create(opts *Node) (*Node, error)
 	Update(existing *Node, updates interface{}) (*Node, error)
 	Replace(existing *Node) (*Node, error)
@@ -151,6 +154,24 @@ func (c *NodeClient) List(opts *types.ListOpts) (*NodeCollection, error) {
 	resp := &NodeCollection{}
 	err := c.apiClient.Ops.DoList(NodeType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *NodeClient) ListAll(opts *types.ListOpts) (*NodeCollection, error) {
+	resp := &NodeCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

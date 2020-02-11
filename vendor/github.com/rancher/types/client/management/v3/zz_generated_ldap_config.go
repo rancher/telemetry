@@ -21,6 +21,7 @@ const (
 	LdapConfigFieldGroupObjectClass                = "groupObjectClass"
 	LdapConfigFieldGroupSearchAttribute            = "groupSearchAttribute"
 	LdapConfigFieldGroupSearchBase                 = "groupSearchBase"
+	LdapConfigFieldGroupSearchFilter               = "groupSearchFilter"
 	LdapConfigFieldLabels                          = "labels"
 	LdapConfigFieldName                            = "name"
 	LdapConfigFieldNestedGroupMembershipEnabled    = "nestedGroupMembershipEnabled"
@@ -41,6 +42,7 @@ const (
 	LdapConfigFieldUserObjectClass                 = "userObjectClass"
 	LdapConfigFieldUserSearchAttribute             = "userSearchAttribute"
 	LdapConfigFieldUserSearchBase                  = "userSearchBase"
+	LdapConfigFieldUserSearchFilter                = "userSearchFilter"
 )
 
 type LdapConfig struct {
@@ -60,6 +62,7 @@ type LdapConfig struct {
 	GroupObjectClass                string            `json:"groupObjectClass,omitempty" yaml:"groupObjectClass,omitempty"`
 	GroupSearchAttribute            string            `json:"groupSearchAttribute,omitempty" yaml:"groupSearchAttribute,omitempty"`
 	GroupSearchBase                 string            `json:"groupSearchBase,omitempty" yaml:"groupSearchBase,omitempty"`
+	GroupSearchFilter               string            `json:"groupSearchFilter,omitempty" yaml:"groupSearchFilter,omitempty"`
 	Labels                          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NestedGroupMembershipEnabled    bool              `json:"nestedGroupMembershipEnabled,omitempty" yaml:"nestedGroupMembershipEnabled,omitempty"`
@@ -80,6 +83,7 @@ type LdapConfig struct {
 	UserObjectClass                 string            `json:"userObjectClass,omitempty" yaml:"userObjectClass,omitempty"`
 	UserSearchAttribute             string            `json:"userSearchAttribute,omitempty" yaml:"userSearchAttribute,omitempty"`
 	UserSearchBase                  string            `json:"userSearchBase,omitempty" yaml:"userSearchBase,omitempty"`
+	UserSearchFilter                string            `json:"userSearchFilter,omitempty" yaml:"userSearchFilter,omitempty"`
 }
 
 type LdapConfigCollection struct {
@@ -94,6 +98,7 @@ type LdapConfigClient struct {
 
 type LdapConfigOperations interface {
 	List(opts *types.ListOpts) (*LdapConfigCollection, error)
+	ListAll(opts *types.ListOpts) (*LdapConfigCollection, error)
 	Create(opts *LdapConfig) (*LdapConfig, error)
 	Update(existing *LdapConfig, updates interface{}) (*LdapConfig, error)
 	Replace(existing *LdapConfig) (*LdapConfig, error)
@@ -129,6 +134,24 @@ func (c *LdapConfigClient) List(opts *types.ListOpts) (*LdapConfigCollection, er
 	resp := &LdapConfigCollection{}
 	err := c.apiClient.Ops.DoList(LdapConfigType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *LdapConfigClient) ListAll(opts *types.ListOpts) (*LdapConfigCollection, error) {
+	resp := &LdapConfigCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

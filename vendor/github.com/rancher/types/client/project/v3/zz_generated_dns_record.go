@@ -13,6 +13,7 @@ const (
 	DNSRecordFieldDescription          = "description"
 	DNSRecordFieldHostname             = "hostname"
 	DNSRecordFieldIPAddresses          = "ipAddresses"
+	DNSRecordFieldIPFamily             = "ipFamily"
 	DNSRecordFieldLabels               = "labels"
 	DNSRecordFieldName                 = "name"
 	DNSRecordFieldNamespaceId          = "namespaceId"
@@ -25,6 +26,7 @@ const (
 	DNSRecordFieldState                = "state"
 	DNSRecordFieldTargetDNSRecordIDs   = "targetDnsRecordIds"
 	DNSRecordFieldTargetWorkloadIDs    = "targetWorkloadIds"
+	DNSRecordFieldTopologyKeys         = "topologyKeys"
 	DNSRecordFieldTransitioning        = "transitioning"
 	DNSRecordFieldTransitioningMessage = "transitioningMessage"
 	DNSRecordFieldUUID                 = "uuid"
@@ -40,6 +42,7 @@ type DNSRecord struct {
 	Description          string            `json:"description,omitempty" yaml:"description,omitempty"`
 	Hostname             string            `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 	IPAddresses          []string          `json:"ipAddresses,omitempty" yaml:"ipAddresses,omitempty"`
+	IPFamily             string            `json:"ipFamily,omitempty" yaml:"ipFamily,omitempty"`
 	Labels               map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                 string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespaceId          string            `json:"namespaceId,omitempty" yaml:"namespaceId,omitempty"`
@@ -52,6 +55,7 @@ type DNSRecord struct {
 	State                string            `json:"state,omitempty" yaml:"state,omitempty"`
 	TargetDNSRecordIDs   []string          `json:"targetDnsRecordIds,omitempty" yaml:"targetDnsRecordIds,omitempty"`
 	TargetWorkloadIDs    []string          `json:"targetWorkloadIds,omitempty" yaml:"targetWorkloadIds,omitempty"`
+	TopologyKeys         []string          `json:"topologyKeys,omitempty" yaml:"topologyKeys,omitempty"`
 	Transitioning        string            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                 string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
@@ -70,6 +74,7 @@ type DNSRecordClient struct {
 
 type DNSRecordOperations interface {
 	List(opts *types.ListOpts) (*DNSRecordCollection, error)
+	ListAll(opts *types.ListOpts) (*DNSRecordCollection, error)
 	Create(opts *DNSRecord) (*DNSRecord, error)
 	Update(existing *DNSRecord, updates interface{}) (*DNSRecord, error)
 	Replace(existing *DNSRecord) (*DNSRecord, error)
@@ -105,6 +110,24 @@ func (c *DNSRecordClient) List(opts *types.ListOpts) (*DNSRecordCollection, erro
 	resp := &DNSRecordCollection{}
 	err := c.apiClient.Ops.DoList(DNSRecordType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *DNSRecordClient) ListAll(opts *types.ListOpts) (*DNSRecordCollection, error) {
+	resp := &DNSRecordCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

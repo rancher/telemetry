@@ -7,7 +7,9 @@ import (
 const (
 	ClusterType                                      = "cluster"
 	ClusterFieldAPIEndpoint                          = "apiEndpoint"
+	ClusterFieldAgentFeatures                        = "agentFeatures"
 	ClusterFieldAgentImage                           = "agentImage"
+	ClusterFieldAgentImageOverride                   = "agentImageOverride"
 	ClusterFieldAllocatable                          = "allocatable"
 	ClusterFieldAnnotations                          = "annotations"
 	ClusterFieldAppliedEnableNetworkPolicy           = "appliedEnableNetworkPolicy"
@@ -60,7 +62,9 @@ const (
 type Cluster struct {
 	types.Resource
 	APIEndpoint                          string                         `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
+	AgentFeatures                        map[string]bool                `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
+	AgentImageOverride                   string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
 	Allocatable                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AppliedEnableNetworkPolicy           bool                           `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
@@ -122,6 +126,7 @@ type ClusterClient struct {
 
 type ClusterOperations interface {
 	List(opts *types.ListOpts) (*ClusterCollection, error)
+	ListAll(opts *types.ListOpts) (*ClusterCollection, error)
 	Create(opts *Cluster) (*Cluster, error)
 	Update(existing *Cluster, updates interface{}) (*Cluster, error)
 	Replace(existing *Cluster) (*Cluster, error)
@@ -146,7 +151,9 @@ type ClusterOperations interface {
 
 	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error)
 
-	ActionRunSecurityScan(resource *Cluster) error
+	ActionRunSecurityScan(resource *Cluster, input *CisScanConfig) error
+
+	ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error)
 
 	ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error)
 }
@@ -179,6 +186,24 @@ func (c *ClusterClient) List(opts *types.ListOpts) (*ClusterCollection, error) {
 	resp := &ClusterCollection{}
 	err := c.apiClient.Ops.DoList(ClusterType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ClusterClient) ListAll(opts *types.ListOpts) (*ClusterCollection, error) {
+	resp := &ClusterCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 
@@ -251,9 +276,15 @@ func (c *ClusterClient) ActionRotateCertificates(resource *Cluster, input *Rotat
 	return resp, err
 }
 
-func (c *ClusterClient) ActionRunSecurityScan(resource *Cluster) error {
-	err := c.apiClient.Ops.DoAction(ClusterType, "runSecurityScan", &resource.Resource, nil, nil)
+func (c *ClusterClient) ActionRunSecurityScan(resource *Cluster, input *CisScanConfig) error {
+	err := c.apiClient.Ops.DoAction(ClusterType, "runSecurityScan", &resource.Resource, input, nil)
 	return err
+}
+
+func (c *ClusterClient) ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error) {
+	resp := &SaveAsTemplateOutput{}
+	err := c.apiClient.Ops.DoAction(ClusterType, "saveAsTemplate", &resource.Resource, input, resp)
+	return resp, err
 }
 
 func (c *ClusterClient) ActionViewMonitoring(resource *Cluster) (*MonitoringOutput, error) {
