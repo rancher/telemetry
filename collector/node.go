@@ -30,7 +30,7 @@ func (h Node) Collect(c *CollectorOpts) interface{} {
 	nonRemoved := NonRemoved()
 
 	log.Debug("Collecting Nodes")
-	nodeList, err := c.Client.Node.List(&nonRemoved)
+	nodeList, err := c.Client.Node.ListAll(&nonRemoved)
 	if err != nil {
 		log.Errorf("Failed to get Nodes err=%s", err)
 		return nil
@@ -66,7 +66,7 @@ func (h Node) Collect(c *CollectorOpts) interface{} {
 		}
 
 		allocatable := node.Allocatable
-		totalCores := GetRawInt(allocatable["cpu"], "")
+		totalCores := GetCPU(allocatable["cpu"])
 		totalMemMb := GetMemMb(allocatable["memory"])
 		totalPods := GetRawInt(allocatable["pods"], "")
 		if totalCores == 0 || totalMemMb == 0 || totalPods == 0 {
@@ -128,10 +128,18 @@ func (h Node) Collect(c *CollectorOpts) interface{} {
 		}
 
 		// Driver
-		nodeTemplate := GetNodeTemplate(c.Client, node.NodeTemplateID)
-		if nodeTemplate != nil {
-			h.FromTmpl++
-			h.Driver.Increment(nodeTemplate.Driver)
+		if len(node.NodeTemplateID) > 0 {
+			nodeTemplate, err := c.Client.NodeTemplate.ByID(node.NodeTemplateID)
+			if err != nil {
+				if IsNotFound(err) {
+					log.Debugf("    nodeTemplate not found [%s]", node.NodeTemplateID)
+				} else {
+					log.Errorf("Failed to get nodeTemplate [%s] err=%s", node.NodeTemplateID, err)
+				}
+			} else {
+				h.FromTmpl++
+				h.Driver.Increment(nodeTemplate.Driver)
+			}
 		}
 	}
 

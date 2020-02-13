@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	UID_SETTING            = "telemetry-uid"
+	TELEMETRY_UID_SETTING  = "telemetry-uid"
 	SERVER_VERSION_SETTING = "server-version"
 )
 
@@ -34,27 +34,15 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 
 	nonRemoved := NonRemoved()
 
-	settings := GetSettingCollection(c.Client)
-
-	uid, _ := GetSettingByCollection(settings, UID_SETTING)
-	uid, _ = i.GetUid(uid, c)
-
-	i.Uid = uid
-	i.Version = "unknown"
+	i.GetUid(c)
+	i.GetVersion(c)
 	i.AuthConfig = make(LabelCount)
 	i.Users = make(LabelCount)
 	i.KontainerDrivers = make(LabelCount)
 	i.NodeDrivers = make(LabelCount)
 
-	if version, ok := GetSettingByCollection(settings, SERVER_VERSION_SETTING); ok {
-		log.Debugf("  Version: %s", version)
-		if version != "" {
-			i.Version = version
-		}
-	}
-
-	log.Debug("Collecting AuthConfigs")
-	configList, err := c.Client.AuthConfig.List(&nonRemoved)
+	log.Debug("  Collecting AuthConfigs")
+	configList, err := c.Client.AuthConfig.ListAll(&nonRemoved)
 	if err == nil {
 		for _, config := range configList.Data {
 			if config.Enabled {
@@ -66,8 +54,8 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 		log.Errorf("Failed to get authProviders err=%s", err)
 	}
 
-	log.Debug("Collecting Users")
-	userList, err := c.Client.User.List(&nonRemoved)
+	log.Debug("  Collecting Users")
+	userList, err := c.Client.User.ListAll(&nonRemoved)
 	if err == nil {
 		for _, user := range userList.Data {
 			for _, principalID := range user.PrincipalIDs {
@@ -81,8 +69,8 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 		log.Errorf("Failed to get users err=%s", err)
 	}
 
-	log.Debug("Collecting NodeDrivers")
-	nodeDriverList, err := c.Client.NodeDriver.List(&nonRemoved)
+	log.Debug("  Collecting NodeDrivers")
+	nodeDriverList, err := c.Client.NodeDriver.ListAll(&nonRemoved)
 	if err == nil {
 		for _, driver := range nodeDriverList.Data {
 			if driver.Active {
@@ -94,8 +82,8 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 		log.Errorf("Failed to get nodeDrivers err=%s", err)
 	}
 
-	log.Debug("Collecting KontainerDrivers")
-	kontainerDriverList, err := c.Client.KontainerDriver.List(&nonRemoved)
+	log.Debug("  Collecting KontainerDrivers")
+	kontainerDriverList, err := c.Client.KontainerDriver.ListAll(&nonRemoved)
 	if err == nil {
 		for _, driver := range kontainerDriverList.Data {
 			if driver.Active {
@@ -109,8 +97,8 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 
 	i.HasInternal = false
 
-	log.Debug("Looking for Local cluser")
-	clusterList, err := c.Client.Cluster.List(&nonRemoved)
+	log.Debug("  Looking for Local cluser")
+	clusterList, err := c.Client.Cluster.ListAll(&nonRemoved)
 	if err == nil {
 		for _, cluster := range clusterList.Data {
 			if cluster.Internal {
@@ -125,22 +113,50 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 	return i
 }
 
-func (i Installation) GetUid(uid string, c *CollectorOpts) (string, bool) {
-	if uid != "" {
-		log.Debugf("  Using Existing Uid: %s", uid)
+func (i *Installation) GetVersion(c *CollectorOpts) {
+	version, err := c.Client.Setting.ByID(SERVER_VERSION_SETTING)
+	if err != nil {
+		log.Errorf("Failed to get setting %s err=%s", SERVER_VERSION_SETTING, err)
+	}
+
+	if version == nil || len(version.Value) == 0 {
+		i.Version = "unknown"
+		return
+	}
+
+	i.Version = version.Value
+	log.Debugf("  Installation Server Version: %s", i.Version)
+}
+
+func GetTelemetryUid(c *CollectorOpts) (string, bool) {
+	telemetryUid, err := c.Client.Setting.ByID(TELEMETRY_UID_SETTING)
+	if err != nil {
+		if !IsNotFound(err) {
+			log.Errorf("Failed to get setting %s err=%s", TELEMETRY_UID_SETTING, err)
+			return "", false
+		}
+	}
+
+	uid := telemetryUid.Value
+	if len(uid) > 0 {
+		log.Debugf("  Using Existing Telemetry Uid: %s", uid)
 		return uid, true
 	}
 
 	newuid, _ := uuid.NewV4()
 	uid = newuid.String()
-	err := SetSetting(c.Client, UID_SETTING, uid)
+	err = SetSetting(c.Client, TELEMETRY_UID_SETTING, uid)
 	if err != nil {
-		log.Debugf("  Error Generating Uid: %s", err)
+		log.Errorf("Error Setting generated Telemetry Uid: %s", err)
 		return "", false
 	}
 
-	log.Debugf("  Generated Uid: %s", uid)
+	log.Debugf("  Generated Telemetry Uid: %s", uid)
 	return uid, true
+}
+
+func (i *Installation) GetUid(c *CollectorOpts) {
+	i.Uid, _ = GetTelemetryUid(c)
 }
 
 func init() {

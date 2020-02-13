@@ -13,6 +13,7 @@ const (
 	NodePoolFieldCreatorID               = "creatorId"
 	NodePoolFieldDeleteNotReadyAfterSecs = "deleteNotReadyAfterSecs"
 	NodePoolFieldDisplayName             = "displayName"
+	NodePoolFieldDriver                  = "driver"
 	NodePoolFieldEtcd                    = "etcd"
 	NodePoolFieldHostnamePrefix          = "hostnamePrefix"
 	NodePoolFieldLabels                  = "labels"
@@ -42,6 +43,7 @@ type NodePool struct {
 	CreatorID               string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DeleteNotReadyAfterSecs int64             `json:"deleteNotReadyAfterSecs,omitempty" yaml:"deleteNotReadyAfterSecs,omitempty"`
 	DisplayName             string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	Driver                  string            `json:"driver,omitempty" yaml:"driver,omitempty"`
 	Etcd                    bool              `json:"etcd,omitempty" yaml:"etcd,omitempty"`
 	HostnamePrefix          string            `json:"hostnamePrefix,omitempty" yaml:"hostnamePrefix,omitempty"`
 	Labels                  map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -74,6 +76,7 @@ type NodePoolClient struct {
 
 type NodePoolOperations interface {
 	List(opts *types.ListOpts) (*NodePoolCollection, error)
+	ListAll(opts *types.ListOpts) (*NodePoolCollection, error)
 	Create(opts *NodePool) (*NodePool, error)
 	Update(existing *NodePool, updates interface{}) (*NodePool, error)
 	Replace(existing *NodePool) (*NodePool, error)
@@ -109,6 +112,24 @@ func (c *NodePoolClient) List(opts *types.ListOpts) (*NodePoolCollection, error)
 	resp := &NodePoolCollection{}
 	err := c.apiClient.Ops.DoList(NodePoolType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *NodePoolClient) ListAll(opts *types.ListOpts) (*NodePoolCollection, error) {
+	resp := &NodePoolCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

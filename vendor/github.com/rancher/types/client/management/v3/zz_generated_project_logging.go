@@ -11,6 +11,7 @@ const (
 	ProjectLoggingFieldCreatorID             = "creatorId"
 	ProjectLoggingFieldCustomTargetConfig    = "customTargetConfig"
 	ProjectLoggingFieldElasticsearchConfig   = "elasticsearchConfig"
+	ProjectLoggingFieldEnableJSONParsing     = "enableJSONParsing"
 	ProjectLoggingFieldFluentForwarderConfig = "fluentForwarderConfig"
 	ProjectLoggingFieldKafkaConfig           = "kafkaConfig"
 	ProjectLoggingFieldLabels                = "labels"
@@ -37,6 +38,7 @@ type ProjectLogging struct {
 	CreatorID             string                 `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	CustomTargetConfig    *CustomTargetConfig    `json:"customTargetConfig,omitempty" yaml:"customTargetConfig,omitempty"`
 	ElasticsearchConfig   *ElasticsearchConfig   `json:"elasticsearchConfig,omitempty" yaml:"elasticsearchConfig,omitempty"`
+	EnableJSONParsing     bool                   `json:"enableJSONParsing,omitempty" yaml:"enableJSONParsing,omitempty"`
 	FluentForwarderConfig *FluentForwarderConfig `json:"fluentForwarderConfig,omitempty" yaml:"fluentForwarderConfig,omitempty"`
 	KafkaConfig           *KafkaConfig           `json:"kafkaConfig,omitempty" yaml:"kafkaConfig,omitempty"`
 	Labels                map[string]string      `json:"labels,omitempty" yaml:"labels,omitempty"`
@@ -68,6 +70,7 @@ type ProjectLoggingClient struct {
 
 type ProjectLoggingOperations interface {
 	List(opts *types.ListOpts) (*ProjectLoggingCollection, error)
+	ListAll(opts *types.ListOpts) (*ProjectLoggingCollection, error)
 	Create(opts *ProjectLogging) (*ProjectLogging, error)
 	Update(existing *ProjectLogging, updates interface{}) (*ProjectLogging, error)
 	Replace(existing *ProjectLogging) (*ProjectLogging, error)
@@ -107,6 +110,24 @@ func (c *ProjectLoggingClient) List(opts *types.ListOpts) (*ProjectLoggingCollec
 	resp := &ProjectLoggingCollection{}
 	err := c.apiClient.Ops.DoList(ProjectLoggingType, opts, resp)
 	resp.client = c
+	return resp, err
+}
+
+func (c *ProjectLoggingClient) ListAll(opts *types.ListOpts) (*ProjectLoggingCollection, error) {
+	resp := &ProjectLoggingCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
 	return resp, err
 }
 

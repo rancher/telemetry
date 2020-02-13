@@ -4,12 +4,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rancher/norman/clientbase"
 	norman "github.com/rancher/norman/types"
-	rancher "github.com/rancher/types/client/management/v3"
 	log "github.com/sirupsen/logrus"
 )
 
-const catalogProto = "catalog://"
+const (
+	catalogProto = "catalog://"
+	searchLimit  = "-1"
+)
 
 type CpuInfo struct {
 	CoresMin   int `json:"cores_min"`
@@ -53,36 +56,6 @@ func (m *MemoryInfo) UpdateAvg(i []float64) {
 	m.UtilAvg = Clamp(0, Round(Average(i)), 100)
 }
 
-func GetNodeTemplate(cli *rancher.Client, id string) *rancher.NodeTemplate {
-	if id == "" {
-		log.Debugf("nodeTemplate id is empty")
-		return nil
-	}
-
-	base := cli.Opts.URL
-	url := base + "/nodeTemplates/" + id
-
-	mTemplate := &rancher.NodeTemplate{}
-	version := "nodeTemplate"
-
-	resource := norman.Resource{}
-	resource.Links = make(map[string]string)
-	resource.Links[version] = url
-
-	err := cli.GetLink(resource, version, mTemplate)
-
-	if mTemplate == nil || mTemplate.Type != "nodeTemplate" {
-		log.Debugf("nodeTemplate not found [%s]", resource.Links[version])
-		return nil
-	}
-	if err != nil {
-		log.Debugf("Error getting nodeTemplate [%s] %s", resource.Links[version], err)
-		return nil
-	}
-
-	return mTemplate
-}
-
 func GetMemMb(item string) int {
 	return int(GetMem(item, "Mi"))
 }
@@ -112,8 +85,20 @@ func GetMem(item, unit string) int64 {
 	return GetRawInt64(item, "") / outUnit
 }
 
+func GetCPU(item string) int {
+	key := "m"
+	value := float64(1000)
+
+	if strings.HasSuffix(item, key) {
+		utilFloat := float64(GetRawInt(item, key)) / value
+		return Round(utilFloat)
+	}
+
+	return GetRawInt(item, "")
+}
+
 func GetRawInt64(item, sep string) int64 {
-	if item == "" {
+	if item == "" || item == sep {
 		return int64(0)
 	}
 
@@ -133,6 +118,10 @@ func GetRawInt64(item, sep string) int64 {
 }
 
 func GetRawInt(item, sep string) int {
+	if item == "" || item == sep {
+		return 0
+	}
+
 	toConv := item
 	if sep != "" {
 		toConv = strings.Replace(item, sep, "", 1)
@@ -199,77 +188,13 @@ func Clamp(min, x, max int) int {
 func NonRemoved() norman.ListOpts {
 	filters := make(map[string]interface{})
 	filters["state_ne"] = "removed"
-	filters["limit"] = "-1"
+	filters["limit"] = searchLimit
 
 	out := norman.ListOpts{
 		Filters: filters,
 	}
 
 	return out
-}
-
-func GetSetting(client *rancher.Client, key string) (string, bool) {
-	return GetSettingByCollection(GetSettingCollection(client), key)
-}
-
-func GetSettingCollection(client *rancher.Client) *rancher.SettingCollection {
-	opts := NonRemoved()
-	opts.Filters["all"] = "true"
-
-	settings, err := client.Setting.List(&opts)
-	if err != nil {
-		log.Errorf("GetSettingsCollection: Error: %s", err)
-		return nil
-	}
-
-	if settings == nil || settings.Type != "collection" || len(settings.Data) == 0 {
-		log.Debugf("Settings collection is empty")
-		return nil
-	}
-
-	return settings
-}
-
-func GetSettingByCollection(settings *rancher.SettingCollection, key string) (string, bool) {
-	if settings == nil || key == "" {
-		return "", false
-	}
-	for _, setting := range settings.Data {
-		if setting.ID == key {
-			if setting.Value == "" {
-				log.Debugf("GetSetting(%s): Not Set", key)
-			} else {
-				log.Debugf("GetSetting(%s) = %s", key, setting.Value)
-			}
-			return setting.Value, true
-		}
-	}
-	return "", false
-}
-
-func SetSetting(client *rancher.Client, key string, value string) error {
-	setting, err := client.Setting.ByID(key)
-	if err == nil {
-		_, err = client.Setting.Update(setting, map[string]interface{}{"value": value})
-		if err == nil {
-			log.Debugf("UpdateSetting(%s,%s)", key, value)
-		} else {
-			log.Debugf("UpdateSetting(%s,%s): Error: %s", key, value, err)
-		}
-		return err
-	}
-
-	setting, err = client.Setting.Create(&rancher.Setting{
-		Name:  key,
-		Value: value,
-	})
-
-	if err == nil {
-		log.Debugf("CreateSetting(%s,%s)", key, value)
-	} else {
-		log.Debugf("CreateSetting(%s,%s): Error: %s", key, value, err)
-	}
-	return err
 }
 
 type LabelCount map[string]int
@@ -285,4 +210,8 @@ func (m *LabelCount) Increment(k string) {
 	} else {
 		(*m)[k] = 1
 	}
+}
+
+func IsNotFound(err error) bool {
+	return clientbase.IsNotFound(err)
 }

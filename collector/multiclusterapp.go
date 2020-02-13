@@ -22,10 +22,10 @@ func (mca MultiClusterApp) RecordKey() string {
 func (mca MultiClusterApp) Collect(c *CollectorOpts) interface{} {
 	nonRemoved := NonRemoved()
 
-	log.Debug("Collecting Apps")
-	appList, err := c.Client.MultiClusterApp.List(&nonRemoved)
+	log.Debug("Collecting MultiClusterApps")
+	appList, err := c.Client.MultiClusterApp.ListAll(&nonRemoved)
 	if err == nil {
-		log.Debugf("  Found %d Apps", len(appList.Data))
+		log.Debugf("  Found %d MultiClusterApps", len(appList.Data))
 
 		var targetCounts []float64
 
@@ -50,20 +50,20 @@ func (mca MultiClusterApp) Collect(c *CollectorOpts) interface{} {
 	}
 
 	// Global DNS Providers (only with management cluster, so ignore errors)
-	log.Debug("Collecting DNS Providers")
-	dnsList, err := c.Client.GlobalDNSProvider.List(&nonRemoved)
+	log.Debug("  Collecting DNS Providers")
+	dnsList, err := c.Client.GlobalDNSProvider.ListAll(&nonRemoved)
 	if err == nil {
 		count := len(dnsList.Data)
-		log.Debugf("  Found %d DNS Providers", count)
+		log.Debugf("    Found %d DNS Providers", count)
 		mca.DnsProviders = count
 	}
 
 	// Global DNS Entries (only with management cluster, so ignore errors)
-	log.Debug("Collecting DNS Entries")
-	entryList, err := c.Client.GlobalDNS.List(&nonRemoved)
+	log.Debug("  Collecting DNS Entries")
+	entryList, err := c.Client.GlobalDNS.ListAll(&nonRemoved)
 	if err == nil {
 		count := len(entryList.Data)
-		log.Debugf("  Found %d DNS Entries", count)
+		log.Debugf("    Found %d DNS Entries", count)
 		mca.DnsEntries = count
 	}
 

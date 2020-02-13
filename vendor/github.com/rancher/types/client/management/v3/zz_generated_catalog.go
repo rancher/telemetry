@@ -64,15 +64,16 @@ type CatalogClient struct {
 
 type CatalogOperations interface {
 	List(opts *types.ListOpts) (*CatalogCollection, error)
+	ListAll(opts *types.ListOpts) (*CatalogCollection, error)
 	Create(opts *Catalog) (*Catalog, error)
 	Update(existing *Catalog, updates interface{}) (*Catalog, error)
 	Replace(existing *Catalog) (*Catalog, error)
 	ByID(id string) (*Catalog, error)
 	Delete(container *Catalog) error
 
-	ActionRefresh(resource *Catalog) error
+	ActionRefresh(resource *Catalog) (*CatalogRefresh, error)
 
-	CollectionActionRefresh(resource *CatalogCollection) error
+	CollectionActionRefresh(resource *CatalogCollection) (*CatalogRefresh, error)
 }
 
 func newCatalogClient(apiClient *Client) *CatalogClient {
@@ -106,6 +107,24 @@ func (c *CatalogClient) List(opts *types.ListOpts) (*CatalogCollection, error) {
 	return resp, err
 }
 
+func (c *CatalogClient) ListAll(opts *types.ListOpts) (*CatalogCollection, error) {
+	resp := &CatalogCollection{}
+	resp, err := c.List(opts)
+	if err != nil {
+		return resp, err
+	}
+	data := resp.Data
+	for next, err := resp.Next(); next != nil && err == nil; next, err = next.Next() {
+		data = append(data, next.Data...)
+		resp = next
+		resp.Data = data
+	}
+	if err != nil {
+		return resp, err
+	}
+	return resp, err
+}
+
 func (cc *CatalogCollection) Next() (*CatalogCollection, error) {
 	if cc != nil && cc.Pagination != nil && cc.Pagination.Next != "" {
 		resp := &CatalogCollection{}
@@ -126,12 +145,14 @@ func (c *CatalogClient) Delete(container *Catalog) error {
 	return c.apiClient.Ops.DoResourceDelete(CatalogType, &container.Resource)
 }
 
-func (c *CatalogClient) ActionRefresh(resource *Catalog) error {
-	err := c.apiClient.Ops.DoAction(CatalogType, "refresh", &resource.Resource, nil, nil)
-	return err
+func (c *CatalogClient) ActionRefresh(resource *Catalog) (*CatalogRefresh, error) {
+	resp := &CatalogRefresh{}
+	err := c.apiClient.Ops.DoAction(CatalogType, "refresh", &resource.Resource, nil, resp)
+	return resp, err
 }
 
-func (c *CatalogClient) CollectionActionRefresh(resource *CatalogCollection) error {
-	err := c.apiClient.Ops.DoCollectionAction(CatalogType, "refresh", &resource.Collection, nil, nil)
-	return err
+func (c *CatalogClient) CollectionActionRefresh(resource *CatalogCollection) (*CatalogRefresh, error) {
+	resp := &CatalogRefresh{}
+	err := c.apiClient.Ops.DoCollectionAction(CatalogType, "refresh", &resource.Collection, nil, resp)
+	return resp, err
 }
