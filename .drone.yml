@@ -31,6 +31,26 @@ steps:
     refs:
     - refs/head/master
     - refs/tags/*
+
+- name: docker-publish
+  image: plugins/docker
+  settings:
+    dockerfile: package/Dockerfile
+    password:
+      from_secret: docker_password
+    repo: "rancher/telemetry"
+    tag: "${DRONE_TAG}-amd64"
+    username:
+      from_secret: docker_username
+  when:
+    instance:
+    - drone-publish.rancher.io
+    ref:
+    - refs/head/master
+    - refs/tags/*
+    event:
+    - tag
+
 volumes:
   - name: docker
     host:
@@ -69,6 +89,26 @@ steps:
     refs:
     - refs/head/master
     - refs/tags/*
+
+- name: docker-publish
+  image: plugins/docker
+  settings:
+    dockerfile: package/Dockerfile
+    password:
+      from_secret: docker_password
+    repo: "rancher/telemetry"
+    tag: "${DRONE_TAG}-arm"
+    username:
+      from_secret: docker_username
+  when:
+    instance:
+    - drone-publish.rancher.io
+    ref:
+    - refs/head/master
+    - refs/tags/*
+    event:
+    - tag
+
 volumes:
   - name: docker
     host:
