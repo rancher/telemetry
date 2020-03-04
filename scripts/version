@@ -16,3 +16,12 @@ fi
 if [ -z "$ARCH" ]; then
     ARCH=amd64
 fi
+
+SUFFIX="-${ARCH}"
+
+TAG=${TAG:-${VERSION}${SUFFIX}}
+REPO=${REPO:-rancher}
+
+if echo $TAG | grep -q dirty; then
+    TAG=dev
+fi
