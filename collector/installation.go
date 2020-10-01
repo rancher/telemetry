@@ -9,13 +9,18 @@ import (
 )
 
 const (
-	TELEMETRY_UID_SETTING  = "telemetry-uid"
-	SERVER_VERSION_SETTING = "server-version"
+	TELEMETRY_UID_SETTING      = "telemetry-uid"
+	SERVER_VERSION_SETTING     = "server-version"
+	UI_DEFAULT_LANDING_SETTING = "ui-default-landing"
+	UI_LANDING_EXPLORER        = "vue"
+	UI_LANDING_MANAGER         = "ember"
+	UI_LANDING_DEFAULT         = UI_LANDING_MANAGER
 )
 
 type Installation struct {
 	Uid                  string     `json:"uid"`
 	Version              string     `json:"version"`
+	UiLanding            string     `json:"uiLanding"`
 	AuthConfig           LabelCount `json:"auth"`
 	Users                LabelCount `json:"users"`
 	KontainerDriverCount int        `json:"kontainerDriverCount"`
@@ -36,6 +41,7 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 
 	i.GetUid(c)
 	i.GetVersion(c)
+	i.GetUILanding(c)
 	i.AuthConfig = make(LabelCount)
 	i.Users = make(LabelCount)
 	i.KontainerDrivers = make(LabelCount)
@@ -113,19 +119,33 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 	return i
 }
 
+func (i *Installation) GetUILanding(c *CollectorOpts) {
+	uiLanding, err := c.Client.Setting.ByID(UI_DEFAULT_LANDING_SETTING)
+	if err != nil {
+		if !IsNotFound(err) {
+			log.Errorf("Failed to get setting %s err=%s", UI_DEFAULT_LANDING_SETTING, err)
+		}
+	}
+	defer log.Debugf("  Installation UI Landing: %s", i.UiLanding)
+	if uiLanding == nil || len(uiLanding.Value) == 0 {
+		i.UiLanding = UI_LANDING_DEFAULT
+		return
+	}
+	i.UiLanding = uiLanding.Value
+}
+
 func (i *Installation) GetVersion(c *CollectorOpts) {
 	version, err := c.Client.Setting.ByID(SERVER_VERSION_SETTING)
 	if err != nil {
 		log.Errorf("Failed to get setting %s err=%s", SERVER_VERSION_SETTING, err)
 	}
-
+	defer log.Debugf("  Installation Server Version: %s", i.Version)
 	if version == nil || len(version.Value) == 0 {
 		i.Version = "unknown"
 		return
 	}
 
 	i.Version = version.Value
-	log.Debugf("  Installation Server Version: %s", i.Version)
 }
 
 func GetTelemetryUid(c *CollectorOpts) (string, bool) {
