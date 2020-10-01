@@ -86,7 +86,7 @@ func (mca MultiClusterApp) Collect(c *CollectorOpts) interface{} {
 
 	// Global DNS Providers (only with management cluster, so ignore errors)
 	log.Debug("  Collecting DNS Providers")
-	dnsList, err := c.Client.GlobalDNSProvider.ListAll(&nonRemoved)
+	dnsList, err := c.Client.GlobalDnsProvider.ListAll(&nonRemoved)
 	if err == nil {
 		count := len(dnsList.Data)
 		log.Debugf("    Found %d DNS Providers", count)
@@ -95,7 +95,7 @@ func (mca MultiClusterApp) Collect(c *CollectorOpts) interface{} {
 
 	// Global DNS Entries (only with management cluster, so ignore errors)
 	log.Debug("  Collecting DNS Entries")
-	entryList, err := c.Client.GlobalDNS.ListAll(&nonRemoved)
+	entryList, err := c.Client.GlobalDns.ListAll(&nonRemoved)
 	if err == nil {
 		count := len(entryList.Data)
 		log.Debugf("    Found %d DNS Entries", count)

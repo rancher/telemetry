@@ -1,7 +1,7 @@
 package collector
 
 import (
-	rancher "github.com/rancher/types/client/cluster/v3"
+	rancher "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 )
 
 type NsInfo struct {
