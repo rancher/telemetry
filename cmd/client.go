@@ -14,10 +14,10 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/rancher/norman/clientbase"
+	rancher "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	collector "github.com/rancher/telemetry/collector"
 	publish "github.com/rancher/telemetry/publish"
 	record "github.com/rancher/telemetry/record"
-	rancher "github.com/rancher/types/client/management/v3"
 )
 
 const (

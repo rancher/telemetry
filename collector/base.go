@@ -1,10 +1,10 @@
 package collector
 
 import (
+	rancherCluster "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
+	rancher "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	rancherProject "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/telemetry/record"
-	rancherCluster "github.com/rancher/types/client/cluster/v3"
-	rancher "github.com/rancher/types/client/management/v3"
-	rancherProject "github.com/rancher/types/client/project/v3"
 )
 
 type CollectorOpts struct {
