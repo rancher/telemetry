@@ -1,8 +1,17 @@
 package collector
 
 import (
+	"fmt"
+
 	rancher "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	k3sEmbeddedDriver  = "k3sBased"
+	k3sRancherDeploy   = "rancher"
+	k3sRancherDeployNs = "cattle-system"
+	systemProjectLabel = "authz.management.cattle.io/system-project"
 )
 
 type Cluster struct {
@@ -98,7 +107,12 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 		log.Debugf("    Pod used=%d, total=%d, util=%d", usedPods, totalPods, util)
 
 		// Driver
-		h.Driver.Increment(cluster.Driver)
+		// Check if Rancher is running on enbedded k3s
+		if isK3sEmbedded(c, cluster) {
+			h.Driver.Increment(k3sEmbeddedDriver)
+		} else {
+			h.Driver.Increment(cluster.Driver)
+		}
 
 		if cluster.RancherKubernetesEngineConfig != nil && cluster.RancherKubernetesEngineConfig.CloudProvider != nil {
 			if cluster.RancherKubernetesEngineConfig.CloudProvider.Name != "" {
@@ -179,4 +193,78 @@ func displayClusterName(c rancher.Cluster) string {
 	} else {
 		return "(" + c.UUID + ")"
 	}
+}
+
+func isK3sEmbedded(c *CollectorOpts, cluster rancher.Cluster) bool {
+	if cluster.Driver == "k3s" && cluster.Internal {
+		systemProjectID, err := getClusterSystemProjectID(c, cluster.ID)
+		if err != nil {
+			log.Debugf("Failed to get System project ID err=%s", err)
+			return false
+		}
+
+		// Checking if Rancher is running as workload within the cluster
+		projectCli, err := GetProjectClient(c, systemProjectID)
+		listOpts := NonRemoved()
+		listOpts.Filters["name"] = k3sRancherDeploy
+		listOpts.Filters["namespaceId"] = k3sRancherDeployNs
+		projects, err := projectCli.Workload.List(&listOpts)
+		if err != nil {
+			log.Debugf("Failed to get System project deployments err=%s", err)
+			return false
+		}
+		if len(projects.Data) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func getClusterProjects(c *CollectorOpts, id string) ([]rancher.Project, error) {
+	if id == "" {
+		return nil, fmt.Errorf("[ERROR] Cluster id is nil")
+	}
+
+	listOpts := NonRemoved()
+	listOpts.Filters["clusterId"] = id
+
+	collection, err := c.Client.Project.List(&listOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	return collection.Data, nil
+}
+
+func getClusterSystemProjectID(c *CollectorOpts, id string) (string, error) {
+	if id == "" {
+		return "", fmt.Errorf("[ERROR] Cluster id is nil")
+	}
+
+	projects, err := getClusterProjects(c, id)
+	if err != nil {
+		return "", err
+	}
+
+	for _, project := range projects {
+		if isSystemProject(&project) {
+			return project.ID, nil
+		}
+	}
+
+	return "", fmt.Errorf("[ERROR] System project not found at Cluster id %s", id)
+}
+
+func isSystemProject(project *rancher.Project) bool {
+	if project == nil {
+		return false
+	}
+
+	for k, v := range project.Labels {
+		if k == systemProjectLabel && v == "true" {
+			return true
+		}
+	}
+
+	return false
 }
