@@ -7,6 +7,11 @@ import (
 	"github.com/rancher/telemetry/record"
 )
 
+var (
+	clusterClients = map[string]*rancherCluster.Client{}
+	projectClients = map[string]*rancherProject.Client{}
+)
+
 type CollectorOpts struct {
 	Client *rancher.Client
 }
@@ -32,12 +37,28 @@ func GetClusterClient(c *CollectorOpts, id string) (*rancherCluster.Client, erro
 	options := *c.Client.Opts
 	options.URL = options.URL + "/clusters/" + id
 
-	return rancherCluster.NewClient(&options)
+	if clusterClients[id] == nil {
+		cli, err := rancherCluster.NewClient(&options)
+		if err != nil {
+			return nil, err
+		}
+		clusterClients[id] = cli
+	}
+
+	return clusterClients[id], nil
 }
 
 func GetProjectClient(c *CollectorOpts, id string) (*rancherProject.Client, error) {
 	options := *c.Client.Opts
 	options.URL = options.URL + "/projects/" + id
 
-	return rancherProject.NewClient(&options)
+	if projectClients[id] == nil {
+		cli, err := rancherProject.NewClient(&options)
+		if err != nil {
+			return nil, err
+		}
+		projectClients[id] = cli
+	}
+
+	return projectClients[id], nil
 }

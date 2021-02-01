@@ -26,13 +26,14 @@ const (
 )
 
 var (
-	publisher *publish.ToUrl
-	url       string
-	accessKey string
-	secretKey string
-	tokenKey  string
-	caCert    string
-	target    string
+	publisher  *publish.ToUrl
+	url        string
+	accessKey  string
+	secretKey  string
+	tokenKey   string
+	caCert     string
+	target     string
+	rancherCli *rancher.Client
 )
 
 func ClientCommand() cli.Command {
@@ -239,14 +240,16 @@ func report() {
 
 func collect() (record.Record, error) {
 	log.Infof("Collecting anonymous data from %s", url)
-	client, err := rancher.NewClient(&clientbase.ClientOpts{
-		URL:      url,
-		TokenKey: tokenKey,
-		Insecure: true,
-	})
-
-	if err != nil {
-		return nil, err
+	if rancherCli == nil {
+		cli, err := rancher.NewClient(&clientbase.ClientOpts{
+			URL:      url,
+			TokenKey: tokenKey,
+			Insecure: true,
+		})
+		if err != nil {
+			return nil, err
+		}
+		rancherCli = cli
 	}
 
 	r := record.Record{}
@@ -254,7 +257,7 @@ func collect() (record.Record, error) {
 	r["ts"] = time.Now().UTC().Format(time.RFC3339)
 
 	opt := collector.CollectorOpts{
-		Client: client,
+		Client: rancherCli,
 	}
 
 	collector.Run(&r, &opt)
