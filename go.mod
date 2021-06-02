@@ -13,5 +13,5 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/urfave/cli v1.20.0
 	github.com/urfave/negroni v1.0.0
-	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
+	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 )
