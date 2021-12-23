@@ -113,3 +113,68 @@ volumes:
   - name: docker
     host:
       path: /var/run/docker.sock
+---
+kind: pipeline
+name: s390x
+
+platform:
+  os: linux
+  arch: amd64
+
+# Hack needed for s390x : https://gist.github.com/colstrom/c2f359f72658aaabb44150ac20b16d7c#gistcomment-3858388
+node:
+  arch: s390x
+
+steps:
+- name: build-s390x
+  pull: default
+  image: rancher/dapper:v0.5.8
+  commands:
+    - dapper ci
+  volumes:
+    - name: docker
+      path: /var/run/docker.sock
+
+- name: github_binary_release_s390x
+  pull: default
+  image: rancher/drone-images:github-release-s390x
+  settings:
+    files:
+    - "bin/*"
+    api_key:
+      from_secret: github_token
+  when:
+    instance:
+    - drone-publish.rancher.io
+    event:
+    - tag
+    refs:
+    - refs/head/master
+    - refs/tags/*
+
+- name: docker-publish
+  image: rancher/drone-images:docker-s390x
+  volumes:
+    - name: docker
+      path: /var/run/docker.sock
+  settings:
+    dockerfile: package/Dockerfile
+    password:
+      from_secret: docker_password
+    repo: "rancher/telemetry"
+    tag: "${DRONE_TAG}-s390x"
+    username:
+      from_secret: docker_username
+  when:
+    instance:
+    - drone-publish.rancher.io
+    ref:
+    - refs/head/master
+    - refs/tags/*
+    event:
+    - tag
+
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
