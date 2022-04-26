@@ -1,6 +1,8 @@
 package collector
 
 import (
+	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"regexp"
 	"strings"
 
@@ -18,16 +20,20 @@ const (
 )
 
 type Installation struct {
-	Uid                  string     `json:"uid"`
-	Version              string     `json:"version"`
-	UiLanding            string     `json:"uiLanding"`
-	AuthConfig           LabelCount `json:"auth"`
-	Users                LabelCount `json:"users"`
-	KontainerDriverCount int        `json:"kontainerDriverCount"`
-	KontainerDrivers     LabelCount `json:"kontainerDrivers"`
-	NodeDriverCount      int        `json:"nodeDriverCount"`
-	NodeDrivers          LabelCount `json:"nodeDrivers"`
-	HasInternal          bool       `json:"hasInternal"`
+	Uid                         string     `json:"uid"`
+	Version                     string     `json:"version"`
+	UiLanding                   string     `json:"uiLanding"`
+	AuthConfig                  LabelCount `json:"auth"`
+	Users                       LabelCount `json:"users"`
+	ServiceAccounts             int        `json:"serviceAccounts"`
+	RoleBindings                int        `json:"roleBindings"`
+	ClusterRoleTemplateBindings int        `json:"clusterRoleTemplateBindings"`
+	ProjectRoleTemplateBindings int        `json:"projectRoleTemplateBindings"`
+	KontainerDriverCount        int        `json:"kontainerDriverCount"`
+	KontainerDrivers            LabelCount `json:"kontainerDrivers"`
+	NodeDriverCount             int        `json:"nodeDriverCount"`
+	NodeDrivers                 LabelCount `json:"nodeDrivers"`
+	HasInternal                 bool       `json:"hasInternal"`
 }
 
 func (i Installation) RecordKey() string {
@@ -75,6 +81,47 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 		log.Errorf("Failed to get users err=%s", err)
 	}
 
+	log.Debug("  Collecting Service Accounts")
+	var saClient v1.ServiceAccountClient
+	saList, err := saClient.List("", metav1.ListOptions{})
+	if err == nil {
+		for range saList.Items {
+			i.ServiceAccounts++
+		}
+	} else {
+		log.Errorf("Failed to get service accounts err=%s", err)
+	}
+
+	log.Debug("  Collecting Role Bindings")
+	rbList, err := c.Client.GlobalRoleBinding.ListAll(&nonRemoved)
+	if err == nil {
+		for range rbList.Data {
+			i.RoleBindings++
+		}
+	} else {
+		log.Errorf("Failed to get role bindings err=%s", err)
+	}
+
+	log.Debug("  Collecting Cluster Role Template Bindings")
+	crtbList, err := c.Client.ClusterRoleTemplateBinding.ListAll(&nonRemoved)
+	if err == nil {
+		for range crtbList.Data {
+			i.ClusterRoleTemplateBindings++
+		}
+	} else {
+		log.Errorf("Failed to get cluster role template bindings err=%s", err)
+	}
+
+	log.Debug("  Collecting Project Role Template Bindings")
+	prtbList, err := c.Client.ProjectRoleTemplateBinding.ListAll(&nonRemoved)
+	if err == nil {
+		for range prtbList.Data {
+			i.ProjectRoleTemplateBindings++
+		}
+	} else {
+		log.Errorf("Failed to get project role template bindings err=%s", err)
+	}
+
 	log.Debug("  Collecting NodeDrivers")
 	nodeDriverList, err := c.Client.NodeDriver.ListAll(&nonRemoved)
 	if err == nil {
@@ -103,7 +150,7 @@ func (i Installation) Collect(c *CollectorOpts) interface{} {
 
 	i.HasInternal = false
 
-	log.Debug("  Looking for Local cluser")
+	log.Debug("  Looking for Local cluster")
 	clusterList, err := c.Client.Cluster.ListAll(&nonRemoved)
 	if err == nil {
 		for _, cluster := range clusterList.Data {

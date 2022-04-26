@@ -12,14 +12,18 @@ const orchestrationName = "cattle-V2.0"
 const rancherCatalogURL = "https://git.rancher.io/charts"
 const projectLabel = "field.cattle.io/projectId"
 
+type ProjectInfo struct {
+	Total    int          `json:"total"`
+	Ns       NsInfo       `json:"namespace"`
+	Pod      PodData      `json:"pod"`
+	Workload WorkloadInfo `json:"workload"`
+}
+
 type Project struct {
-	Total         int          `json:"total"`
-	Ns            NsInfo       `json:"namespace"`
-	Workload      WorkloadInfo `json:"workload"`
+	ProjectInfo
 	Pipeline      PipelineInfo `json:"pipeline"`
 	LibraryCharts LabelCount   `json:"charts"`
 	HPA           HPAInfo      `json:"hpa"`
-	Pod           PodData      `json:"pod"`
 	Orchestration LabelCount   `json:"orch"`
 }
 

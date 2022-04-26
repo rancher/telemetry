@@ -2,9 +2,10 @@ package collector
 
 import (
 	"fmt"
-
 	rancher "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -15,17 +16,26 @@ const (
 )
 
 type Cluster struct {
-	Active           int         `json:"active"`
-	Total            int         `json:"total"`
-	Ns               *NsInfo     `json:"namespace"`
-	Cpu              *CpuInfo    `json:"cpu"`
-	Mem              *MemoryInfo `json:"mem"`
-	Pod              *PodInfo    `json:"pod"`
-	Driver           LabelCount  `json:"driver"`
-	IstioTotal       int         `json:"istio"`
-	MonitoringTotal  int         `json:"monitoring"`
-	LogProviderCount LabelCount  `json:"logging"`
-	CloudProvider    LabelCount  `json:"cloudProvider"`
+	Active             int          `json:"active"`
+	Total              int          `json:"total"`
+	Ns                 *NsInfo      `json:"namespace"`
+	Project            *ProjectInfo `json:"project"`
+	Cpu                *CpuInfo     `json:"cpu"`
+	Mem                *MemoryInfo  `json:"mem"`
+	Pod                *PodInfo     `json:"pod"`
+	Driver             LabelCount   `json:"driver"`
+	SecretTotal        int          `json:"secret"`
+	IstioTotal         int          `json:"istio"`
+	MonitoringTotal    int          `json:"monitoring"`
+	Service            *ServiceInfo `json:"service"`
+	LogProviderCount   LabelCount   `json:"logging"`
+	CloudProvider      LabelCount   `json:"cloudProvider"`
+	CISTotal           int          `json:"cis"`
+	CISProfileVersion  LabelCount   `json:"cisProfileVersion"`
+	NetworkPolicyTotal int          `json:"networkPolicy"`
+	Hybrid             int          `json:"hybrid"`
+	LinuxWorkerTotal   int          `json:"linuxWorker"`
+	WindowsWorkerTotal int          `json:"windowsWorker"`
 }
 
 func (h Cluster) RecordKey() string {
@@ -55,6 +65,7 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 	var memUtils []float64
 	var podUtils []float64
 	var nsUtils []float64
+	var serviceUtils []float64
 
 	// Clusters
 	for _, cluster := range clusterList.Data {
@@ -107,17 +118,52 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 		log.Debugf("    Pod used=%d, total=%d, util=%d", usedPods, totalPods, util)
 
 		// Driver
-		// Check if Rancher is running on enbedded k3s
+		// Check if Rancher is running on embedded k3s
 		if isK3sEmbedded(c, cluster) {
 			h.Driver.Increment(k3sEmbeddedDriver)
 		} else {
 			h.Driver.Increment(cluster.Driver)
 		}
 
+		// Windows Worker Node Count
+		if cluster.WindowsWorkerCount > 0 {
+			h.Hybrid++
+			utilFloat = float64(cluster.WindowsWorkerCount)
+			util = Round(utilFloat)
+			h.WindowsWorkerTotal += util
+
+		}
+
+		// Linux Worker Node Count
+		if cluster.LinuxWorkerCount > 0 {
+			utilFloat = float64(cluster.LinuxWorkerCount)
+			util = Round(utilFloat)
+			h.LinuxWorkerTotal += util
+		}
+
+		// CIS
+		if cluster.ScheduledClusterScan.Enabled {
+			h.CISTotal++
+			h.CISProfileVersion.Increment(cluster.ScheduledClusterScan.ScanConfig.CisScanConfig.Profile)
+		}
+
+		// Network Policy
+		if cluster.AppliedEnableNetworkPolicy {
+			h.NetworkPolicyTotal++
+		}
+
 		if cluster.RancherKubernetesEngineConfig != nil && cluster.RancherKubernetesEngineConfig.CloudProvider != nil {
 			if cluster.RancherKubernetesEngineConfig.CloudProvider.Name != "" {
 				h.CloudProvider.Increment(
 					cluster.RancherKubernetesEngineConfig.CloudProvider.Name)
+			}
+		}
+
+		var secretClient v1.SecretClient
+		secretList, err := secretClient.List("", metav1.ListOptions{})
+		if err == nil {
+			for range secretList.Items {
+				h.SecretTotal++
 			}
 		}
 
@@ -134,6 +180,28 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 			h.Ns.Update(totalNs)
 			nsUtils = append(nsUtils, float64(totalNs))
 			h.Ns.UpdateDetails(nsCollection.Data)
+		}
+
+		// Secret
+		//secretCollection := v1.SecretLister()
+		//if err != nil {
+		//	log.Errorf("Failed to get Secrets err=%s", err)
+		//} else {
+		//	totalSecret := len(secretCollection.Data)
+		//	h.SecretTotal.Update(totalSecret)
+		//	nsUtils = append(nsUtils, float64(totalSecret))
+		//	h.Ns.UpdateDetails(secretCollection.Data)
+		//}
+
+		// Services
+		serviceCollection, err := clusterClient.APIService.ListAll(&nonRemoved)
+		if err != nil {
+			log.Errorf("Failed to get Services err=%s", err)
+		} else {
+			totalServices := len(serviceCollection.Data)
+			h.Service.Update(totalServices)
+			serviceUtils = append(serviceUtils, float64(totalServices))
+			h.Service.UpdateDetails(serviceCollection.Data)
 		}
 
 		// Monitoring
