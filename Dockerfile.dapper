@@ -1,12 +1,9 @@
-FROM ubuntu:18.04
-# FROM arm=armhf/ubuntu:16.04 arm64=arm64v8/ubuntu:16.04
+FROM registry.suse.com/bci/golang:1.17-11.51
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
 
-RUN apt-get update && \
-    apt-get install -y gcc ca-certificates git wget curl vim less file && \
-    rm -f /bin/sh && ln -s /bin/bash /bin/sh
+RUN zypper -n install git vim less file curl wget tar gzip
 
 ENV GOLANG_ARCH_s390x=s390x GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH_arm64=arm64 GOLANG_ARCH=GOLANG_ARCH_${ARCH} \
     GOPATH=/go PATH=/go/bin:/usr/local/go/bin:${PATH} SHELL=/bin/bash
@@ -36,6 +33,11 @@ ENV DAPPER_SOURCE /go/src/github.com/rancher/telemetry/
 ENV DAPPER_OUTPUT ./bin ./dist
 ENV DAPPER_DOCKER_SOCKET true
 ENV HOME ${DAPPER_SOURCE}
+ENV GOPATH /go
+
+# Fix error - exec: "s390x-linux-gnu-gcc": executable file not found in $PATH
+ENV CC gcc
+
 WORKDIR ${DAPPER_SOURCE}
 
 ENTRYPOINT ["./scripts/entry"]

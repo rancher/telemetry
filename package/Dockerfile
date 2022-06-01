@@ -1,6 +1,16 @@
-FROM alpine:3.11.11
-RUN apk -u --no-cache add curl ca-certificates
+FROM registry.suse.com/bci/bci-micro:15.3.16.3
+
+ARG user=telemetry
+
+RUN echo "$user:x:1000:1000::/home/$user:/bin/bash" >> /etc/passwd && \
+    echo "$user:x:1000:" >> /etc/group && \
+    mkdir /home/$user && \
+    chown -R $user:$user /home/$user
+
 ADD "bin/telemetry" /
+
+USER $user
+
 ENTRYPOINT ["/telemetry"]
 CMD ["server"]
 EXPOSE 8115
