@@ -3,6 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func respondError(w http.ResponseWriter, req *http.Request, msg string, statusCode int) {
@@ -22,7 +24,11 @@ func respondError(w http.ResponseWriter, req *http.Request, msg string, statusCo
 func respondSuccess(w http.ResponseWriter, req *http.Request, val interface{}) {
 	bytes, err := json.MarshalIndent(val, "", "  ")
 	if err == nil {
-		w.Write(bytes)
+		_, writeErr := w.Write(bytes)
+		if writeErr != nil {
+			log.Errorf("Error while writing in respondSuccess: %v", writeErr)
+		}
+
 	} else {
 		respondError(w, req, "Error serializing to JSON: "+err.Error(), http.StatusInternalServerError)
 	}

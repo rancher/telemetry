@@ -17,11 +17,12 @@ func SetSetting(client *rancher.Client, key string, value string) error {
 				log.Debugf("CreateSetting(%s,%s)", key, value)
 			} else {
 				log.Debugf("CreateSetting(%s,%s): Error: %s", key, value, err)
+				return err
 			}
 		} else {
 			log.Debugf("Failed to get setting %s err=%s", key, err)
+			return err
 		}
-		return err
 	}
 	_, err = client.Setting.Update(setting, map[string]interface{}{"value": value})
 	if err == nil {

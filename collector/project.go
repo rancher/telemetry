@@ -10,7 +10,6 @@ import (
 
 const orchestrationName = "cattle-V2.0"
 const rancherCatalogURL = "https://git.rancher.io/charts"
-const projectLabel = "field.cattle.io/projectId"
 
 type Project struct {
 	Total         int          `json:"total"`
@@ -168,7 +167,7 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 						}
 						if catalog == rancherCatalog.Name && catalogType != "clusterCatalog" && catalogType != "projectCatalog" {
 							perClusterKey := fmt.Sprintf("%s:%s", clusterID, template) // Only count 1 per cluster
-							if perClusterCatalogMap[perClusterKey] != true {
+							if !perClusterCatalogMap[perClusterKey] {
 								perClusterCatalogMap[perClusterKey] = true
 								p.LibraryCharts.Increment(template)
 							}
@@ -205,7 +204,6 @@ func SplitExternalID(externalID string) (string, string, string, error) {
 	// pre-upgrade setups will have global catalogs, where externalId field on templateversions won't have namespace.
 	// since these are global catalogs, we can default to global namespace
 	if templateVersionNamespace == "" {
-		templateVersionNamespace = "cattle-global-data"
 		catalog = catalogWithNamespace
 	}
 	return catalog, catalogType, template, nil

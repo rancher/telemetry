@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 
@@ -55,7 +54,10 @@ func main() {
 		cmd.ServerCommand(),
 	}
 
-	app.Run(os.Args)
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatalf("Error on app.Run: %v", err)
+	}
 }
 
 func before(c *cli.Context) error {
@@ -81,7 +83,7 @@ func before(c *cli.Context) error {
 	pidFile := c.String("pid-file")
 	if pidFile != "" {
 		log.Infof("Writing pid %d to %s", os.Getpid(), pidFile)
-		if err := ioutil.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
+		if err := os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0644); err != nil {
 			str := fmt.Sprintf("Failed to write pid file %s: %v", pidFile, err)
 			return cli.NewExitError(str, 1)
 		}

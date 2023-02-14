@@ -3,7 +3,6 @@ package publish
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -72,7 +71,10 @@ func (p *Postgres) Report(r record.Record, clientIp string) error {
 	tx, err := p.Conn.Begin()
 	if err != nil {
 		log.Errorf("Error creating transaction: %s", err)
-		tx.Rollback()
+		rbErr := tx.Rollback()
+		if rbErr != nil {
+			return fmt.Errorf("tx err: %v, rb err: %v", err, rbErr)
+		}
 		return err
 	}
 
@@ -80,7 +82,10 @@ func (p *Postgres) Report(r record.Record, clientIp string) error {
 	log.Debugf("Add Record: %v, %s", recordId, err)
 	if err != nil {
 		log.Errorf("Error adding record: %s", err)
-		tx.Rollback()
+		rbErr := tx.Rollback()
+		if rbErr != nil {
+			return fmt.Errorf("tx err: %v, rb err: %v", err, rbErr)
+		}
 		return err
 	}
 
@@ -93,14 +98,20 @@ func (p *Postgres) Report(r record.Record, clientIp string) error {
 	_, err = p.upsertByDay(tx, uid, recordId)
 	if err != nil {
 		log.Errorf("Error updating day: %s", err)
-		tx.Rollback()
+		rbErr := tx.Rollback()
+		if rbErr != nil {
+			return fmt.Errorf("tx err: %v, rb err: %v", err, rbErr)
+		}
 		return err
 	}
 
 	err = tx.Commit()
 	if err != nil {
 		log.Errorf("Error commiting transatcion: %s", err)
-		tx.Rollback()
+		rbErr := tx.Rollback()
+		if rbErr != nil {
+			return fmt.Errorf("tx err: %v, rb err: %v", err, rbErr)
+		}
 		return err
 	}
 
@@ -116,7 +127,7 @@ func (p *Postgres) testDb() error {
 	}
 
 	if one != 1 {
-		return errors.New(fmt.Sprintf("SELECT 1 == %d?!", one))
+		return fmt.Errorf("SELECT 1 == %d?!", one)
 	}
 
 	return nil

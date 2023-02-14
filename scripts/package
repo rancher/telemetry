@@ -9,7 +9,7 @@ mkdir -p dist/artifacts
 cp bin/telemetry-${ARCH} bin/telemetry
 cp bin/telemetry-${ARCH} dist/artifacts/
 
-IMAGE=${REPO}/telemetry:${TAG}-${ARCH}
+IMAGE=${REPO}/telemetry:${TAG}
 DOCKERFILE=package/Dockerfile
 if [ -e ${DOCKERFILE}.${ARCH} ]; then
     DOCKERFILE=${DOCKERFILE}.${ARCH}

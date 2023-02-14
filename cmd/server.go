@@ -220,7 +220,11 @@ func serverCheck(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	w.Write([]byte("pageok"))
+	_, err := w.Write([]byte("pageok"))
+	if err != nil {
+		log.Errorf("Error while writing in serverCheck: %v", err)
+	}
+
 }
 
 func abs(i int) int {
@@ -245,10 +249,6 @@ func max(i, j int) int {
 	return j
 }
 
-func clamp(i, x, j int) int {
-	return max(i, min(x, j))
-}
-
 func round(f float64) int {
 	return int(f + 0.5)
 }
@@ -259,7 +259,7 @@ func serverRoot(w http.ResponseWriter, req *http.Request) {
 
 	var rows [][]byte
 	for y := 0; y < nRows; y++ {
-		rows = append(rows, make([]byte, nCols+1, nCols+1))
+		rows = append(rows, make([]byte, nCols+1))
 
 		for x := 0; x <= nCols; x++ {
 			if x == 0 || x == nCols-1 {
@@ -307,16 +307,17 @@ func serverRoot(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	w.Write([]byte(fmt.Sprintf("Rancher Telemetry %s\n", version)))
-	w.Write([]byte("+" + strings.Repeat("-", nCols-2) + "+\n"))
-	w.Write([]byte("|" + strings.Repeat(" ", nCols-2) + "|\n"))
+	_, _ = w.Write([]byte(fmt.Sprintf("Rancher Telemetry %s\n", version)))
+
+	_, _ = w.Write([]byte("+" + strings.Repeat("-", nCols-2) + "+\n"))
+	_, _ = w.Write([]byte("|" + strings.Repeat(" ", nCols-2) + "|\n"))
 
 	for _, row := range rows {
-		w.Write(row)
+		_, _ = w.Write(row)
 	}
 
-	w.Write([]byte("|" + strings.Repeat(" ", nCols-2) + "|\n"))
-	w.Write([]byte("+" + strings.Repeat("-", nCols-2) + "+\n"))
+	_, _ = w.Write([]byte("|" + strings.Repeat(" ", nCols-2) + "|\n"))
+	_, _ = w.Write([]byte("+" + strings.Repeat("-", nCols-2) + "+\n"))
 }
 
 func serverPublish(w http.ResponseWriter, req *http.Request) {
@@ -333,7 +334,7 @@ func serverPublish(w http.ResponseWriter, req *http.Request) {
 	ip := anonymizeIp(realIp)
 	log.Debugf("Publish from %s: %s", realIp, r)
 
-	dbPublisher.Report(r, ip)
+	err = dbPublisher.Report(r, ip)
 	if err != nil {
 		log.Errorf("Error publishing to DB: %s", err)
 	}
@@ -566,6 +567,10 @@ func apiHistoryValue(w http.ResponseWriter, req *http.Request) {
 // ------------
 func apiInstallByUid(w http.ResponseWriter, req *http.Request) {
 	opt, err := getOptions(req, RequiredOptions{"Uid"})
+	if err != nil {
+		respondError(w, req, err.Error(), 422)
+		return
+	}
 
 	records, err := dbPublisher.GetRecordsByUid(opt.Uid, opt.Days)
 	if err != nil {
@@ -610,12 +615,6 @@ func apiRecordById(w http.ResponseWriter, req *http.Request) {
 	out, err := dbPublisher.GetRecordById(id)
 	respond(w, req, out, err)
 }
-
-func adminUi(w http.ResponseWriter, req *http.Request) {
-	respondSuccess(w, req, "<html><body>Hi</body></html>")
-}
-
-// ------------
 
 func requestIp(req *http.Request) string {
 	if enableXff {

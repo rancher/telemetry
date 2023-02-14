@@ -1,6 +1,6 @@
 module github.com/rancher/telemetry
 
-go 1.17
+go 1.19
 
 replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
 

@@ -205,6 +205,11 @@ func isK3sEmbedded(c *CollectorOpts, cluster rancher.Cluster) bool {
 
 		// Checking if Rancher is running as workload within the cluster
 		projectCli, err := GetProjectClient(c, systemProjectID)
+		if err != nil {
+			log.Errorf("Failed to get project client ID %s err=%s", systemProjectID, err)
+			return false
+		}
+
 		listOpts := NonRemoved()
 		listOpts.Filters["name"] = k3sRancherDeploy
 		listOpts.Filters["namespaceId"] = k3sRancherDeployNs
