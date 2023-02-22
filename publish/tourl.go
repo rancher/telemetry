@@ -3,9 +3,8 @@ package publish
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
@@ -16,10 +15,7 @@ import (
 
 type ToUrl struct {
 	url              string
-	uid              string
 	telemetryVersion string
-	rancherImage     string
-	rancherVersion   string
 }
 
 func NewToUrl(c *cli.Context) *ToUrl {
@@ -51,7 +47,7 @@ func (p *ToUrl) Report(r record.Record, clientIp string) error {
 	}
 
 	defer res.Body.Close()
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return err
 	}
@@ -61,6 +57,6 @@ func (p *ToUrl) Report(r record.Record, clientIp string) error {
 		return nil
 	} else {
 		log.Errorf(fmt.Sprintf("Server said %d: %s", res.StatusCode, body))
-		return errors.New(fmt.Sprintf("Server returned %d", res.StatusCode))
+		return fmt.Errorf("Server returned %d", res.StatusCode)
 	}
 }

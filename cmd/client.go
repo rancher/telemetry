@@ -3,8 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -31,8 +31,6 @@ var (
 	accessKey  string
 	secretKey  string
 	tokenKey   string
-	caCert     string
-	target     string
 	rancherCli *rancher.Client
 )
 
@@ -123,20 +121,6 @@ func clientRun(c *cli.Context) error {
 		tokenKey = accessKey + ":" + secretKey
 	}
 
-	clientVersion := c.String("version")
-	if clientVersion == "" {
-		clientVersion = "unknown"
-	}
-
-	crt_file := c.String("crt-file")
-	if crt_file != "" {
-		crt, err := ioutil.ReadFile(crt_file)
-		if err != nil {
-			return cli.NewExitError("Error reading certificate file", 1)
-		}
-		caCert = string(crt)
-	}
-
 	if c.Bool("once") {
 		return clientShowOnce()
 	}
@@ -159,11 +143,8 @@ func clientRun(c *cli.Context) error {
 		if dur.Nanoseconds() > 0 {
 			ticker := time.NewTicker(dur)
 			go func() {
-				for {
-					select {
-					case <-ticker.C:
-						report()
-					}
+				for range ticker.C {
+					report()
 				}
 			}()
 		}
@@ -208,12 +189,18 @@ func clientShow(w http.ResponseWriter, req *http.Request) {
 }
 
 func clientReload(w http.ResponseWriter, req *http.Request) {
-	w.Write([]byte("ok"))
+	_, err := w.Write([]byte("ok"))
+	if err != nil {
+		log.Errorf("Error while writing in clientReload: %v", err)
+	}
 }
 
 func clientReport(w http.ResponseWriter, req *http.Request) {
 	report()
-	w.Write([]byte("ok"))
+	_, err := w.Write([]byte("ok"))
+	if err != nil {
+		log.Errorf("Error while writing in clientReport: %v", err)
+	}
 }
 
 func report() {
@@ -225,7 +212,7 @@ func report() {
 		log.Errorf("Error collecting data: %s", err)
 		return
 	}
-	diff := time.Now().Sub(start).String()
+	diff := time.Since(start).String()
 	log.Debugf("Collected stats in %s", diff)
 
 	err = publisher.Report(r, "")
@@ -234,7 +221,7 @@ func report() {
 		return
 	}
 
-	diff = time.Now().Sub(start).String()
+	diff = time.Since(start).String()
 	log.Debugf("Completed report in %s", diff)
 }
 
@@ -269,7 +256,7 @@ func isExisting() bool {
 	want := strconv.Itoa(RECORD_VERSION)
 	have := ""
 
-	data, err := ioutil.ReadFile(EXISTING_FILE)
+	data, err := os.ReadFile(EXISTING_FILE)
 	if err == nil {
 		have = string(data)
 	}
@@ -277,7 +264,10 @@ func isExisting() bool {
 	if want == have {
 		return true
 	} else {
-		ioutil.WriteFile(EXISTING_FILE, []byte(want), 0644)
+		err := os.WriteFile(EXISTING_FILE, []byte(want), 0644)
+		if err != nil {
+			log.Errorf("Error while writing file [%s]: %v", EXISTING_FILE, err)
+		}
 		return false
 	}
 }
