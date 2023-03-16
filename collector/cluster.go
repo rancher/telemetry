@@ -156,28 +156,27 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 	h.LogProviderCount = make(LabelCount)
 
 	logList, err := c.Client.ClusterLogging.ListAll(nil)
-	if err != nil {
-		log.Errorf("Failed to get Cluster Loggings err=%s", err)
-		return nil
-	}
-
-	for _, logging := range logList.Data {
-		if logging.AppliedSpec != nil {
-			switch {
-			case logging.AppliedSpec.ElasticsearchConfig != nil:
-				h.LogProviderCount["Elasticsearch"]++
-			case logging.AppliedSpec.SplunkConfig != nil:
-				h.LogProviderCount["Splunk"]++
-			case logging.AppliedSpec.KafkaConfig != nil:
-				h.LogProviderCount["Kafka"]++
-			case logging.AppliedSpec.SyslogConfig != nil:
-				h.LogProviderCount["Syslog"]++
-			case logging.AppliedSpec.FluentForwarderConfig != nil:
-				h.LogProviderCount["Fluentd"]++
-			case logging.AppliedSpec.CustomTargetConfig != nil:
-				h.LogProviderCount["Custom"]++
+	if err == nil {
+		for _, logging := range logList.Data {
+			if logging.AppliedSpec != nil {
+				switch {
+				case logging.AppliedSpec.ElasticsearchConfig != nil:
+					h.LogProviderCount["Elasticsearch"]++
+				case logging.AppliedSpec.SplunkConfig != nil:
+					h.LogProviderCount["Splunk"]++
+				case logging.AppliedSpec.KafkaConfig != nil:
+					h.LogProviderCount["Kafka"]++
+				case logging.AppliedSpec.SyslogConfig != nil:
+					h.LogProviderCount["Syslog"]++
+				case logging.AppliedSpec.FluentForwarderConfig != nil:
+					h.LogProviderCount["Fluentd"]++
+				case logging.AppliedSpec.CustomTargetConfig != nil:
+					h.LogProviderCount["Custom"]++
+				}
 			}
 		}
+	} else {
+		log.Errorf("Failed to get Cluster Loggings err=%s", err)
 	}
 
 	return h
