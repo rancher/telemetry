@@ -183,6 +183,8 @@ func serverRun(c *cli.Context) error {
 
 	admin.HandleFunc("/admin/records/{id}", apiRecordById) // nothing
 
+	admin.HandleFunc("/admin/restore/{day}", apiRestoreByDay)
+
 	n := negroni.New()
 	n.Use(negroni.HandlerFunc(checkAuth))
 	n.UseHandler(admin)
@@ -614,6 +616,29 @@ func apiRecordById(w http.ResponseWriter, req *http.Request) {
 
 	out, err := dbPublisher.GetRecordById(id)
 	respond(w, req, out, err)
+}
+
+func apiRestoreByDay(w http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+	day := vars["day"]
+	if day == "" {
+		respondError(w, req, "day is required", 422)
+		return
+	}
+
+	installs, err := dbPublisher.GetRecordsByDay(day)
+	if err != nil {
+		respondError(w, req, err.Error(), 500)
+		return
+	}
+
+	coll := Collection{
+		Type:         "collection",
+		ResourceType: "installation",
+		Data:         installs,
+	}
+
+	respondSuccess(w, req, coll)
 }
 
 func requestIp(req *http.Request) string {
