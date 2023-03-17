@@ -5,9 +5,4 @@ cd $(dirname $0)/..
 
 echo Running tests
 
-# s390x doesn't support -race flag
-if [ "${ARCH}" != "s390x" ]; then 
-    go test -race -cover -tags=test ./...
-else
-    go test -cover -tags=test ./...
-fi
+go test -cover -tags=test ./...

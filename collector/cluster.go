@@ -14,6 +14,11 @@ const (
 	systemProjectLabel = "authz.management.cattle.io/system-project"
 )
 
+var (
+	ClusterGetClusterClient = GetClusterClient
+	ClusterGetProjectClient = GetProjectClient
+)
+
 type Cluster struct {
 	Active           int         `json:"active"`
 	Total            int         `json:"total"`
@@ -122,18 +127,19 @@ func (h Cluster) Collect(c *CollectorOpts) interface{} {
 		}
 
 		// Namespace
-		clusterClient, err := GetClusterClient(c, cluster.ID)
+		clusterClient, err := ClusterGetClusterClient(c, cluster.ID)
 		if err != nil {
 			log.Errorf("Failed to get Cluster client err=%s", err)
-		}
-		nsCollection, err := clusterClient.Namespace.ListAll(nil)
-		if err != nil {
-			log.Errorf("Failed to get Namespaces err=%s", err)
 		} else {
-			totalNs := len(nsCollection.Data)
-			h.Ns.Update(totalNs)
-			nsUtils = append(nsUtils, float64(totalNs))
-			h.Ns.UpdateDetails(nsCollection.Data)
+			nsCollection, err := clusterClient.Namespace.ListAll(nil)
+			if err != nil {
+				log.Errorf("Failed to get Namespaces err=%s", err)
+			} else {
+				totalNs := len(nsCollection.Data)
+				h.Ns.Update(totalNs)
+				nsUtils = append(nsUtils, float64(totalNs))
+				h.Ns.UpdateDetails(nsCollection.Data)
+			}
 		}
 
 		// Monitoring
@@ -203,7 +209,7 @@ func isK3sEmbedded(c *CollectorOpts, cluster rancher.Cluster) bool {
 		}
 
 		// Checking if Rancher is running as workload within the cluster
-		projectCli, err := GetProjectClient(c, systemProjectID)
+		projectCli, err := ClusterGetProjectClient(c, systemProjectID)
 		if err != nil {
 			log.Errorf("Failed to get project client ID %s err=%s", systemProjectID, err)
 			return false
@@ -225,10 +231,6 @@ func isK3sEmbedded(c *CollectorOpts, cluster rancher.Cluster) bool {
 }
 
 func getClusterProjects(c *CollectorOpts, id string) ([]rancher.Project, error) {
-	if id == "" {
-		return nil, fmt.Errorf("[ERROR] Cluster id is nil")
-	}
-
 	listOpts := NonRemoved()
 	listOpts.Filters["clusterId"] = id
 
@@ -260,10 +262,6 @@ func getClusterSystemProjectID(c *CollectorOpts, id string) (string, error) {
 }
 
 func isSystemProject(project *rancher.Project) bool {
-	if project == nil {
-		return false
-	}
-
 	for k, v := range project.Labels {
 		if k == systemProjectLabel && v == "true" {
 			return true

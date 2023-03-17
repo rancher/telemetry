@@ -8,8 +8,10 @@ import (
 )
 
 var (
-	clusterClients = map[string]*rancherCluster.Client{}
-	projectClients = map[string]*rancherProject.Client{}
+	ClusterClients          = map[string]*rancherCluster.Client{}
+	ProjectClients          = map[string]*rancherProject.Client{}
+	NewRancherClusterClient = rancherCluster.NewClient
+	NewRancherProjectClient = rancherProject.NewClient
 )
 
 type CollectorOpts struct {
@@ -37,28 +39,28 @@ func GetClusterClient(c *CollectorOpts, id string) (*rancherCluster.Client, erro
 	options := *c.Client.Opts
 	options.URL = options.URL + "/clusters/" + id
 
-	if clusterClients[id] == nil {
-		cli, err := rancherCluster.NewClient(&options)
+	if ClusterClients[id] == nil {
+		cli, err := NewRancherClusterClient(&options)
 		if err != nil {
 			return nil, err
 		}
-		clusterClients[id] = cli
+		ClusterClients[id] = cli
 	}
 
-	return clusterClients[id], nil
+	return ClusterClients[id], nil
 }
 
 func GetProjectClient(c *CollectorOpts, id string) (*rancherProject.Client, error) {
 	options := *c.Client.Opts
 	options.URL = options.URL + "/projects/" + id
 
-	if projectClients[id] == nil {
-		cli, err := rancherProject.NewClient(&options)
+	if ProjectClients[id] == nil {
+		cli, err := NewRancherProjectClient(&options)
 		if err != nil {
 			return nil, err
 		}
-		projectClients[id] = cli
+		ProjectClients[id] = cli
 	}
 
-	return projectClients[id], nil
+	return ProjectClients[id], nil
 }
