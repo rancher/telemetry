@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: telemetry-server
+  namespace: telemetry
+data:
+  TELEMETRY_PG_USER: admin
+  TELEMETRY_PG_PASS: admin
+  TELEMETRY_PG_HOST: postgresql
+  # TELEMETRY_PG_PORT: "5432"
+  # TELEMETRY_PG_DBNAME: telemetry
+  # TELEMETRY_PG_SSL: disable

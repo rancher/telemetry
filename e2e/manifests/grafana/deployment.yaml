@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: telemetry
+spec:
+  selector:
+    matchLabels:
+      name: grafana
+  template:
+    metadata:
+      labels:
+        name: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:8.3.11  # Online: 8.3.1
+        resources:
+          requests:
+            memory: 128Mi
+            cpu: 100m
+        ports:
+        - containerPort: 3000
+
+        volumeMounts:
+          - mountPath: /etc/dashboards
+            name: grafana-dashboards-vol
+          - mountPath: /etc/grafana/provisioning/dashboards
+            name: grafana-dashboards-config-vol
+          - mountPath: /etc/grafana/provisioning/datasources
+            name: grafana-datasources-vol
+
+      volumes:
+        - name: grafana-dashboards-vol
+          configMap:
+            name: grafana-dashboards
+        - name: grafana-dashboards-config-vol
+          configMap:
+            name: grafana-dashboards-config
+        - name: grafana-datasources-vol
+          configMap:
+            name: grafana-datasources
+            

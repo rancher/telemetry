@@ -1,0 +1,143 @@
+name: E2E
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run everyday day at 9:00 AM
+    - cron: '0 9 * * *'
+  pull_request:
+    paths-ignore:
+      - 'scripts/**'
+      - '*.md'
+  push:
+    branches:
+      - 'release/*"'
+      - 'main'
+      - 'master'
+
+env:
+  GOARCH: amd64
+  CGO_ENABLED: 0
+  SETUP_GO_VERSION: '^1.19'
+  HOST_NAME: telemetry-test  # for `start` script
+  CLUSTER_NAME: telemetry-test
+  TOKEN: ${{ secrets.TOKEN }}
+
+jobs:
+  single-cluster:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          path: .
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.SETUP_GO_VERSION }}
+
+      - name: Provision k3d Cluster
+        uses: AbsaOSS/k3d-action@v2
+        with:
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          args: >-
+            --api-port 6443
+            --network "nw01"
+
+      - name: Compile telemetry & build container image
+        run: |
+          curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > /usr/local/bin/dapper
+          chmod +x /usr/local/bin/dapper
+          TAG=dev dapper
+
+      - name: Upload Docker images
+        run: |
+          k3d image import -c ${{ env.CLUSTER_NAME }} rancher/telemetry:dev
+
+      - name: Install Rancher
+        run: |
+          set -ex
+
+          echo "working directory: $(pwd)"
+          echo "files in working directory: $(find)"
+
+          pip install httpie
+          cd e2e
+          source ./start
+          install-rancher
+
+          # Verify
+          for i in {0..20}; do
+            ip=$(
+              kubectl get -A ingress -o json |
+                jq -r '.items[0].status.loadBalancer.ingress[0].ip'
+            )
+
+            if [[ "${ip}" == "null" ]]; then
+              sleep 1
+              continue
+            fi
+
+            if http --check-status --verify=no GET "https://${ip}" Host:${HOST_NAME} ; then
+              >&2 echo "Rancher installation verified successfully"
+              exit 0
+            fi
+
+            sleep 1
+          done
+
+          >&2 echo "Rancher installation test failed"
+          exit 1
+
+      - name: Configure Rancher
+        run: |
+          cd e2e && \
+            source ./start && \
+            CLUSTER_IP=$(get-cluster-ip) && \
+            init-base "admin"
+
+      - name: Install PostgreSQL
+        run: |
+          cd e2e && source ./start && install-postgres-13.2
+
+      - name: Install Telemetry Server Dev
+        run: |
+          cd e2e && source ./start && install-telemetry-server-dev
+
+      - name: Install Telemetry Client Dev
+        run: |
+          cd e2e && source ./start && install-telemetry-client-dev
+
+      - name: Install InfluxDB
+        run: |
+          cd e2e && source ./start && install-influx
+
+      - name: Install Telemetry Stats
+        run: |
+          cd e2e && source ./start && install-telemetry-stats
+
+      - name: Test report retrieval from PostgreSQL through Telemetry Server
+        run: |
+          set -x
+          ns="${ns:-telemetry}"
+          cd e2e
+          kubectl -n "${ns}" apply --wait -k manifests/tests
+          kubectl -n telemetry wait \
+            --for=condition=complete \
+            --timeout=300s \
+            job/test-telemetry-server
+
+      - name: Collect logs
+        if: failure()
+        run: |
+          bash k8s/kubectl-dump telemetry
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v3
+        if: ${{ failure() && github.action }}
+        with:
+          name: gha-telemetry-dev-e2e-logs-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            kubectl-dump-*
+          retention-days: 2
