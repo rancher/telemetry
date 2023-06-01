@@ -15,7 +15,8 @@ const (
 )
 
 var (
-	AppRancherCatalogs = []string{AppCatalogLibrary, AppCatalogSystemLibrary}
+	AppRancherCatalogs  = []string{AppCatalogLibrary, AppCatalogSystemLibrary}
+	AppGetProjectClient = GetProjectClient
 )
 
 type AppTemplate struct {
@@ -63,7 +64,7 @@ func (a App) Collect(c *CollectorOpts) interface{} {
 	log.Debugf("  Found %d Projects", len(projectList.Data))
 
 	for _, project := range projectList.Data {
-		projectClient, err := GetProjectClient(c, project.ID)
+		projectClient, err := AppGetProjectClient(c, project.ID)
 		if err != nil {
 			log.Errorf("Failed to get project client ID %s err=%s", project.ID, err)
 			continue

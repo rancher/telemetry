@@ -8,6 +8,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	ProjectGetClusterClient = GetClusterClient
+	ProjectGetProjectClient = GetProjectClient
+)
+
 const orchestrationName = "cattle-V2.0"
 const rancherCatalogURL = "https://git.rancher.io/charts"
 
@@ -65,7 +70,7 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 	for _, project := range list.Data {
 		parts := strings.SplitN(project.ID, ":", 2)
 		clusterID := parts[0]
-		clusterClient, err := GetClusterClient(c, clusterID)
+		clusterClient, err := ProjectGetClusterClient(c, clusterID)
 		if err != nil {
 			log.Errorf("Failed to get cluster client ID %s err=%s", clusterID, err)
 		} else {
@@ -85,7 +90,7 @@ func (p Project) Collect(c *CollectorOpts) interface{} {
 			}
 		}
 
-		projectClient, err := GetProjectClient(c, project.ID)
+		projectClient, err := ProjectGetProjectClient(c, project.ID)
 		if err != nil {
 			log.Errorf("Failed to get project client ID %s err=%s", project.ID, err)
 			continue
