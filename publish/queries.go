@@ -234,6 +234,66 @@ WHERE
 	return rec, nil
 }
 
+func (p *Postgres) GetRecordsByDay(day string) ([]ApiInstallation, error) {
+	var records []ApiInstallation
+
+	// Validate input.
+	_, err := time.Parse("2006-01-02", day)
+	if err != nil {
+		return records, err
+	}
+
+	query := `
+		select
+			i.id, -- not r.id, because that's not compatible with GetActiveInstalls
+			r.uid,
+			i.first_seen,
+			r.ts as last_seen, -- that's necessary to restore correctly
+			i.last_ip,
+			r.data
+		from record r
+		join installation i on (r.uid = i.uid)
+		where
+			r.ts >= $1 and
+			r.ts < $1 + interval '1 day' and
+			r.uid != ''
+	`
+
+	log.Debugf("Query: %s", strings.ReplaceAll(query, "$1", day))
+	rows, err := p.Conn.Query(query, day)
+	if err != nil {
+		log.Debugf("%+v\n", err)
+		return records, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var record ApiInstallation
+		var data []byte
+
+		err = rows.Scan(
+			&record.Id,
+			&record.Uid,
+			&record.FirstSeen,
+			&record.LastSeen,
+			&record.LastIp,
+			&data,
+		)
+		if err != nil {
+			return records, err
+		}
+
+		err = json.Unmarshal(data, &record.Record)
+		if err != nil {
+			return records, err
+		}
+
+		records = append(records, record)
+	}
+
+	return records, err
+}
+
 func (p *Postgres) SumOfActiveInstalls(hours int, fields []string) (AggregatedFields, error) {
 	fieldSql, err := fieldQuery(fields, "r.data")
 	if err != nil {
