@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-telemetry-server
+  namespace: telemetry
+spec:
+  backoffLimit: 0 # Don't retry, we've a loop in the bash script
+  template:
+    spec:
+      restartPolicy: Never # Also only run once
+      containers:
+        - name: test-container
+          image: bash:5
+          securityContext:
+            runAsUser: 0
+          command: ["bash"]
+          args:
+            - "/tests/test-telemetry-server.sh"
+          envFrom:
+            - secretRef:
+                name: telemetry
+          volumeMounts:
+            - name: test-files-volume
+              mountPath: /tests
+
+      volumes:
+        - name: test-files-volume
+          configMap:
+            name: tests

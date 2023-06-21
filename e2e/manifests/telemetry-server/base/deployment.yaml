@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemetry-server
+spec:
+  selector:
+    matchLabels:
+      name: telemetry-server
+  template:
+    metadata:
+      labels:
+        name: telemetry-server
+    spec:
+      containers:
+        - name: telemetry-server
+          image: rancher/telemetry:v0.6.1
+          livenessProbe:
+            failureThreshold: 3
+            periodSeconds: 30
+            successThreshold: 1
+            httpGet:
+              port: tele-server
+              path: healthcheck.html
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            periodSeconds: 30
+            successThreshold: 1
+            httpGet:
+              port: tele-server
+              path: healthcheck.html
+            timeoutSeconds: 1
+          resources:
+            requests:
+              memory: '1Gi'
+              cpu: 100m
+            limits:
+              memory: '4Gi'
+              cpu: 500m
+          ports:
+            - name: tele-server
+              protocol: TCP
+              containerPort: 8115
+          envFrom:
+            - configMapRef:
+                name: telemetry-server
+          env:
+            - name: TELEMETRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: telemetry
+                  key: access_key
+            - name: TELEMETRY_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: telemetry
+                  key: secret_key
+            - name: TELEMETRY_DEBUG
+              value: "true"
+          args:
+            - server

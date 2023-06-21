@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: telemetry
+
+resources:
+  - "deployment.yaml"
+  - "service.yaml"
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: grafana-dashboards
+    files:
+      - ./dashboards/telemetry/dashboard-apps.json
+      - ./dashboards/telemetry/dashboard-drivers.json
+      - ./dashboards/telemetry/dashboard-rancher.json
+
+  - name: grafana-datasources
+    files:
+      - ./datasource.yaml
+
+  - name: grafana-dashboards-config
+    files:
+      - ./dashboards.yaml

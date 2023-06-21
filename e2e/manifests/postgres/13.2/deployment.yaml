@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    name: postgresql
+  name: postgresql
+  namespace: telemetry
+spec:
+  selector:
+    matchLabels:
+      name: postgresql
+  template:
+    metadata:
+      labels:
+        name: postgresql
+    spec:
+      containers:
+      - image: postgres:13.2
+        name: postgres
+        imagePullPolicy: IfNotPresent
+        livenessProbe:  # restarts containers (kill)
+          failureThreshold: 3
+          periodSeconds: 30
+          successThreshold: 1
+          tcpSocket:
+            port: pgsql
+          timeoutSeconds: 1
+        readinessProbe:  # doesn't kill the container, just stops serving traffic
+          failureThreshold: 3
+          periodSeconds: 30
+          successThreshold: 1
+          tcpSocket:
+            port: pgsql
+          timeoutSeconds: 1
+        startupProbe:  # other probes pause till this one succeeds
+          tcpSocket:
+            port: pgsql
+          failureThreshold: 86400
+          periodSeconds: 10
+        env:
+          - name: POSTGRES_USER
+            value: admin
+          - name: POSTGRES_PASSWORD
+            value: admin
+          - name: POSTGRES_DB
+            value: telemetry
+        ports:
+        - containerPort: 5432
+          name: pgsql
+          protocol: TCP
+        resources:
+          requests:
+            memory: 1G
+            cpu: 100m
+          limits:
+            memory: 1G
+            cpu: 1
+        volumeMounts:
+          - name: pgdata
+            mountPath: /var/lib/postgresql/data
+          - name: postgresql-config
+            mountPath: /docker-entrypoint-initdb.d/create_db.sql
+            subPath: create_db.sql
+            readOnly: true
+          - name: dshm
+            mountPath: /dev/shm
+
+      - image: dpage/pgadmin4:6
+        name: pgadmin
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            memory: 128M
+            cpu: 500m
+          limits:
+            memory: 1G
+            cpu: 1
+        ports:
+          - containerPort: 80
+            name: pgadmin-ui
+        env:
+          - name: PGADMIN_DEFAULT_EMAIL
+            value: admin@local.host
+          - name: PGADMIN_DEFAULT_PASSWORD
+            value: admin
+        volumeMounts:
+          - mountPath: /pgadmin4/servers.json
+            subPath: servers.json
+            name: pgadmin-config
+
+      volumes:
+        - name: pgdata
+          hostPath:
+            path: /var/lib/postgresql/data
+        - name: postgresql-config
+          configMap:
+            name: postgresql
+        - name: pgadmin-config
+          configMap:
+            name: pgadmin
+        - name: dshm
+          emptyDir:
+            medium: Memory

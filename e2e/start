@@ -1,0 +1,374 @@
+#!/bin/bash
+
+# The host name to set Rancher Manager to listen for from the host.
+: "${HOST_NAME:=rancher}"
+# A k3d cluster name to use. Different names prevent collisions.
+: "${CLUSTER_NAME:=telemetry-dev}"
+# K3s version to use.
+: "${K3S_VERSION:=rancher/k3s:v1.23.6-k3s1}" 
+# Debug mode.
+: "${DEBUG:=false}"
+
+debug_flag=""
+if [ -n "${DEBUG}" ]; then
+  debug_flag="--debug"
+fi
+
+# The cluster IP is determined when the k3d cluster has been created and is any
+# node that forwards HTTP ports to the nodes on the cluster. It can hence be
+# used to send HTTP requests to a service, provided the host header is set
+# correctly.
+CLUSTER_IP=""
+
+# Set up the directory structure for mounting /var/lib/postgresql/data from the
+# host into k3d. This is necessary to import data from the host on clsuter
+# create, and prevents that working data needs to be re-imported on each cluster
+# creation. This is just one part of the functionatlity that handles that.
+function setup-volume() {
+  if [ ! -d /var/lib/postgresql/data ]; then
+    if ! mkdir -p /var/lib/postgresql/data; then
+      sudo mkdir -p /var/lib/postgresql/data
+    fi
+  fi
+  if [ ! -d /var/lib/postgresql/docker-entrypoint-initdb.d ]; then
+    if ! mkdir -p /var/lib/postgresql/docker-entrypoint-initdb.d; then
+      sudo mkdir -p /var/lib/postgresql/docker-entrypoint-initdb.d
+    fi
+  fi
+  echo "CREATE ROLE telemetry WITH PASSWORD 'telemetry';" | sudo tee \
+    /var/lib/postgresql/docker-entrypoint-initdb.d/000-init.sql
+}
+
+# Creates a K3d cluster with the predefined or overridden CLUSTER_NAME.
+# CLUSTER_NAME needs to be different if several instances of k3d clusters should
+# be run simultaneously.
+function k3d-create() {
+  local create_command="k3d cluster create ${CLUSTER_NAME} --agents 1 --servers 1"
+  create_command="$create_command --image ${K3S_VERSION}"
+  create_command="$create_command --volume /var/lib/postgresql:/var/lib/postgresql"
+  while ! $create_command; do
+    k3d cluster delete "${CLUSTER_NAME}"
+  done
+}
+
+function install-rancher() {
+  echo "Installing cert-manager"
+  helm repo add jetstack https://charts.jetstack.io
+  kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.5.1/cert-manager.crds.yaml
+  helm install cert-manager jetstack/cert-manager \
+    --namespace cert-manager \
+    --create-namespace \
+    --version v1.5.1 \
+    "${debug_flag}" \
+    --atomic
+  kubectl wait --namespace cert-manager --for=condition=ready pod --all --timeout=30s
+
+  echo "Installing Rancher..."
+  helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
+  kubectl create namespace cattle-system
+
+  helm install rancher rancher-stable/rancher \
+    --set bootstrapPassword=admin \
+    --namespace cattle-system \
+    --set hostname="${HOST_NAME}" \
+    --set replicas=1 \
+    "${debug_flag}" \
+    --atomic
+
+  CLUSTER_IP=$(get-cluster-ip)
+}
+
+function get-cluster-ip() {
+  for i in {0..10}; do
+    >&2 echo "retrieving IP of cluster (attempt #$((i+1)))"
+    ip=$(
+      kubectl get -A ingress -o json |
+        jq -r '.items[0].status.loadBalancer.ingress[0].ip'
+    )
+
+    if [[ -z "${ip}" || "${ip}" = "null" ]]; then
+      >&2 echo "error: IP couldn't be determined using Ingress status"
+      return 1
+    fi
+
+    if http --quiet --check-status --verify=no GET "https://${ip}" "Host:${HOST_NAME}" ; then
+      echo "${ip}"
+      return 0
+    fi
+
+    sleep 2
+  done
+
+  >&2 echo "error: retrieval of cluster IP failed"
+  return 1
+}
+
+# Rancher needs a host name, so we add the IP address of a cluster
+# node 
+function configure-hostnames() {
+  if [ -n "${NO_ETC_HOST}" ]; then
+    echo "skipping hostname configuration"
+    return 0
+  fi
+
+  if [ -z "${CLUSTER_IP}" ]; then
+    >&2 echo "error: cannot configure hostnames: CLUSTER_IP is empty"
+    return 1
+  fi
+  if [ -z "${HOST_NAME}" ]; then
+    >&2 echo "error: no HOST_NAME found"
+    return 1
+  fi
+
+  # Do a backup once, but don't ever overwrite it.
+  if [ ! -f /etc/hosts.bak ]; then
+    sudo cp -a /etc/hosts /etc/hosts.bak
+  fi
+
+  sudo sed -n -e "/ ${HOST_NAME}/!p" -i /etc/hosts
+  echo "${CLUSTER_IP} ${HOST_NAME}" | sudo tee -a /etc/hosts >/dev/null
+}
+
+# Get login token, good for 1 minute.
+function get-login-token() {
+  if [ -z "$1" ]; then
+    echo >&2 "error: argument missing: password"
+    return 1
+  fi
+
+  local password
+  local login_token
+
+  password="$1"
+
+  for i in {1..10}; do
+    login_token=$(
+      curl -k -s -X POST \
+        "https://${CLUSTER_IP}/v3-public/localProviders/local?action=login" \
+          -H 'Content-Type: application/json' \
+          -H "Host: ${HOST_NAME}" \
+          --data-binary "{\"username\":\"admin\",\"password\":\"$password\"}" |
+            jq -r .token
+    )
+
+    if [[ "$?" -eq "0" && -n "${login_token}" && "${login_token}" != "null" ]]; then
+      echo "${login_token}"
+      return 0
+    fi
+
+    sleep 1
+  done
+
+  echo >&2 "error: login token could not be acquired"
+  return 1
+}
+
+function change-password() {
+  local token
+  if [ -z "$1" ]; then
+    echo >&2 "The first argument must be an API token"
+    return 1
+  fi
+  token="$1"
+
+  # Change password
+  curl -k -s -X POST \
+    "https://${CLUSTER_IP}/v3/users?action=changepassword" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer $token" \
+    -H "Host: ${HOST_NAME}" \
+    --data-binary '{"currentPassword":"admin","newPassword":"dev-admin-pw"}'
+}
+
+# Create API key, good forever.
+function create-api-key() {
+  local login_token
+  if [ -z "$1" ]; then
+    echo >&2 "error: argument missing: token"
+    return 1
+  else
+    login_token="$1"
+  fi
+
+  local api_key
+  api_key=$(
+    curl -k -s \
+      -X POST \
+      "https://${CLUSTER_IP}/v3/token" \
+      -H 'Content-Type: application/json' \
+      -H "Authorization: Bearer $login_token" \
+      -H "Host: ${HOST_NAME}" \
+      --data-binary '{"type": "token", "description": "for scripts"}' |
+        jq -r .token
+  )
+
+  if [ "$?" -ne 0 ]; then
+    echo >&2 "API key could not be acquired"
+    return 1
+  fi
+
+  echo "${api_key}"
+}
+
+# Set server-url
+function change-server-url() {
+  local api_key
+  if [ -z "$1" ]; then
+    echo >&2 "The first argument must be an API token"
+    return 1
+  else
+    api_key="$1"
+  fi
+  curl -k -s \
+    "https://${CLUSTER_IP}/v3/settings/server-url" \
+    -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer $api_key" \
+    -H "Host: ${HOST_NAME}" \
+    -X PUT \
+    --data-binary "{\"name\":\"server-url\",\"value\":\"https://${CLUSTER_IP}/\"}"
+
+  if [ "$?" -ne "0" ]; then
+    echo >&2 "Changing server URL failed"
+  fi
+}
+
+function install-postgres-13.2() {
+  kubectl apply -f manifests/namespace.yaml
+  kubectl apply -k manifests/postgres/13.2
+}
+
+function install-postgres-15.2() {
+  kubectl apply -f manifests/namespace.yaml
+  kubectl apply -k manifests/postgres/15.2
+}
+
+function install-influx() {
+  kubectl apply -f manifests/namespace.yaml
+  helm repo add influxdata https://helm.influxdata.com
+  helm upgrade \
+    -n telemetry \
+    -i influxdb \
+    --version 4.12.0 \
+    -f manifests/influxdb/values.yaml \
+    influxdata/influxdb
+}
+
+function install-telemetry-stats() {
+  kubectl apply -f manifests/namespace.yaml
+  kubectl apply --server-side -k ./manifests/telemetry-stats/base
+}
+
+function install-telemetry-stats-dev() {
+  kubectl apply -f manifests/namespace.yaml
+  kubectl apply --server-side -k ./manifests/telemetry-stats/dev/
+}
+
+function create-secret {
+  if [ "$#" -ne 3 ]; then
+    echo >&2 "error: create-secret: argument missing: need 3, have $#"
+    return 1
+  fi
+
+  local api_key="$1"
+  local access_key="$2"
+  local secret_key="$3"
+
+  cat <<EOF >secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: telemetry
+  namespace: telemetry
+stringData:
+  access_key: $access_key
+  secret_key: $secret_key
+  api_key: $api_key
+EOF
+
+  kubectl create namespace telemetry || true
+  kubectl apply -f secret.yaml
+}
+
+function install-telemetry-server() {
+  kubectl \
+    -n telemetry \
+    apply \
+    -k ./manifests/telemetry-server/base
+}
+
+function install-telemetry-server-dev() {
+  kubectl \
+    -n telemetry \
+    apply \
+    -k ./manifests/telemetry-server/dev
+}
+
+function install-telemetry-client() {
+  kubectl \
+    -n telemetry \
+    apply \
+    -k ./manifests/telemetry-client/base
+}
+
+function install-telemetry-client-dev() {
+  kubectl \
+    -n telemetry \
+    apply \
+    -k ./manifests/telemetry-client/dev
+}
+
+function install-base() {
+  setup-volume
+  k3d-create
+  install-rancher
+  configure-hostnames
+}
+
+function init-base() {
+  # shellcheck disable=SC2120
+  if [ -z "$1" ]; then
+    >&2 echo "error: init-base: missing argument: password"
+    return 1
+  fi
+
+  local login_token
+  login_token=$(get-login-token "$1")
+  if [ "${login_token}" = "" ] ; then
+    >&2 echo "error: login token couldn't be acquired"
+    return 1
+  fi
+
+  local api_key
+  api_key=$(create-api-key "${login_token}")
+  if [ -z "${api_key}" ]; then
+    >&2 echo "error: API key couldn't be created"
+    return 1
+  fi
+
+  IFS=':' read -ra keys <<< "$api_key"
+  local access_key="${keys[0]}"
+  local secret_key="${keys[1]}"
+
+  change-server-url "$api_key"
+  change-password "$api_key" # Required to skip the setup screen
+
+  create-secret "$api_key" "${access_key}" "${secret_key}"
+}
+
+# To be called on a developers' machine.
+function start() {
+  install-base
+  init-base "admin"
+  install-postgres-15.2
+  install-influx
+  install-telemetry-client
+  install-telemetry-server
+  install-telemetry-stats
+}
+
+# Only run start if script wasn't sourced.
+if ! (return 0 2>/dev/null); then
+  set -ex
+  start
+  set +ex
+fi

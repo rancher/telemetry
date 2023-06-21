@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemetry-stats
+  namespace: telemetry
+spec:
+  selector:
+    matchLabels:
+      app: telemetry-stats
+  template:
+    metadata:
+      labels:
+        app: telemetry-stats
+    spec:
+      containers:
+      - name: telemetry-stats
+        image: rancherlabs/rancher-telemetry-stats:v0.0.1
+        env:
+          - name: TELEMETRY_DEBUG
+            value: "true"
+          - name: TELEMETRY_URL
+            value: http://telemetry-server:8115
+          - name: TELEMETRY_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                key: access_key
+                name: telemetry
+          - name: TELEMETRY_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                key: secret_key
+                name: telemetry
+        resources:
+          limits:
+            memory: 1.5Gi
+            cpu: 1000m
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        command:
+          - "/bin/rancher-telemetry-stats"
+        args:
+          - --debug
+          - --insecure
+          - --influxurl=http://influxdb:8086
+          - --influxdb=telemetry
+          - --influxuser=admin
+          - --influxpass=admin
+          - --refresh=30

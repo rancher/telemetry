@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemetry-server
+spec:
+  template:
+    spec:
+      containers:
+        - name: telemetry-server
+          imagePullPolicy: Never
+          image: rancher/telemetry:dev
