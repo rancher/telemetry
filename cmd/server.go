@@ -142,7 +142,6 @@ func getHash(user string, realm string) string {
 
 func serverRun(c *cli.Context) error {
 	log.Infof("Telemetry Server %s", c.App.Version)
-	rand.Seed(time.Now().UnixNano())
 
 	version = c.App.Version
 	dbPublisher = publish.NewPostgres(c)
